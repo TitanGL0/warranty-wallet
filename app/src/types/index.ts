@@ -1,5 +1,24 @@
 export type Language = "he" | "en";
 export type WarrantyStatus = "valid" | "expiringSoon" | "expired";
+export type Theme = "light" | "dark" | "system";
+export type ExpiryAlertDays = 30 | 60 | 90 | 180;
+
+export type ProductInput = {
+  name: string;
+  brand: string;
+  category: string;
+  serial: string;
+  imei: string;
+  purchaseDate: string;
+  warrantyMonths: number;
+  importer: string;
+  importerPhone: string;
+  notes: string;
+  price: number | null;
+  currency: string;
+  receiptImageUrl: string | null;
+  warrantyImageUrl: null;
+};
 
 export interface Product {
   id: string;
@@ -8,17 +27,21 @@ export interface Product {
   brand: string;
   category: string;
   serial: string;
-  imei?: string;
+  imei: string;
   purchaseDate: string;
-  warrantyYears: number;
+  warrantyYears?: number;
+  warrantyMonths: number;
   importer: string;
+  importerPhone: string;
   notes: string;
+  price: number | null;
+  currency: string;
   warrantyEnd: string;
   status: WarrantyStatus;
-  createdAt: string;
-  updatedAt: string;
-  receiptImageUrl?: string;
-  productImageUrl?: string;
+  createdAt: string | null;
+  updatedAt: string | null;
+  receiptImageUrl: string | null;
+  warrantyImageUrl: string | null;
 }
 
 export interface WarrantyRequest {
@@ -33,7 +56,14 @@ export interface WarrantyRequest {
 
 export interface UserSettings {
   language: Language;
+  theme: Theme;
   notificationsEnabled: boolean;
+  notifyExpiringSoon: boolean;
+  notifyExpiredWarranty: boolean;
+  notifyMissingReceipt: boolean;
+  notifyProductAdded: boolean;
+  notifyMonthlySummary: boolean;
+  expiryAlertDays: ExpiryAlertDays;
 }
 
 export interface UserProfile {

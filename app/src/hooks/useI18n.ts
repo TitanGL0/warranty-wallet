@@ -14,6 +14,6 @@ export function useI18n() {
   return {
     language,
     isRTL: language === "he",
-    t: (key: TranslationKey) => dictionary[key],
+    t: <K extends TranslationKey>(key: K) => dictionary[key],
   };
 }

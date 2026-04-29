@@ -1,14 +1,17 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, Stack } from "expo-router";
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
-import { ScreenScaffold } from "../../src/components/ScreenScaffold";
-import { colors } from "../../src/constants/colors";
+import { AuthShell } from "../../src/components/AuthShell";
+import { type ColorPalette } from "../../src/constants/colors";
 import { useI18n } from "../../src/hooks/useI18n";
+import { useThemeColors } from "../../src/hooks/useThemeColors";
 import type { TranslationKey } from "../../src/i18n/he";
 import { registerWithEmail } from "../../src/services/auth";
 
 export default function RegisterScreen() {
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { t, isRTL } = useI18n();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -44,44 +47,59 @@ export default function RegisterScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: t("auth.register.title") }} />
-      <ScreenScaffold
-        descriptionKey="auth.register.description"
-        iconName="person-add-outline"
-        titleKey="auth.register.title"
-      >
+      <Stack.Screen options={{ headerShown: false }} />
+      <AuthShell>
         <View style={styles.card}>
-          <Text style={[styles.label, { textAlign: isRTL ? "right" : "left" }]}>{t("auth.register.name")}</Text>
-          <TextInput
-            editable={!isSubmitting}
-            placeholder={t("auth.register.name")}
-            placeholderTextColor={colors.textSubtle}
-            style={[styles.input, { textAlign: isRTL ? "right" : "left" }, isSubmitting && styles.inputDisabled]}
-            value={name}
-            onChangeText={setName}
-          />
-          <Text style={[styles.label, { textAlign: isRTL ? "right" : "left" }]}>{t("auth.register.email")}</Text>
-          <TextInput
-            autoCapitalize="none"
-            autoCorrect={false}
-            editable={!isSubmitting}
-            keyboardType="email-address"
-            placeholder={t("auth.register.email")}
-            placeholderTextColor={colors.textSubtle}
-            style={[styles.input, { textAlign: isRTL ? "right" : "left" }, isSubmitting && styles.inputDisabled]}
-            value={email}
-            onChangeText={setEmail}
-          />
-          <Text style={[styles.label, { textAlign: isRTL ? "right" : "left" }]}>{t("auth.register.password")}</Text>
-          <TextInput
-            editable={!isSubmitting}
-            placeholder={t("auth.register.password")}
-            placeholderTextColor={colors.textSubtle}
-            secureTextEntry
-            style={[styles.input, { textAlign: isRTL ? "right" : "left" }, isSubmitting && styles.inputDisabled]}
-            value={password}
-            onChangeText={setPassword}
-          />
+          <Text style={[styles.cardTitle, { textAlign: isRTL ? "right" : "left" }]}>
+            {t("auth.register.title")}
+          </Text>
+
+          <View style={styles.fieldGroup}>
+            <Text style={[styles.label, { textAlign: isRTL ? "right" : "left" }]}>
+              {t("auth.register.name")}
+            </Text>
+            <TextInput
+              editable={!isSubmitting}
+              placeholder={t("auth.register.name")}
+              placeholderTextColor={colors.textSubtle}
+              style={[styles.input, { textAlign: isRTL ? "right" : "left" }, isSubmitting && styles.inputDisabled]}
+              value={name}
+              onChangeText={setName}
+            />
+          </View>
+
+          <View style={styles.fieldGroup}>
+            <Text style={[styles.label, { textAlign: isRTL ? "right" : "left" }]}>
+              {t("auth.register.email")}
+            </Text>
+            <TextInput
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!isSubmitting}
+              keyboardType="email-address"
+              placeholder={t("auth.register.email")}
+              placeholderTextColor={colors.textSubtle}
+              style={[styles.input, { textAlign: isRTL ? "right" : "left" }, isSubmitting && styles.inputDisabled]}
+              value={email}
+              onChangeText={setEmail}
+            />
+          </View>
+
+          <View style={styles.fieldGroup}>
+            <Text style={[styles.label, { textAlign: isRTL ? "right" : "left" }]}>
+              {t("auth.register.password")}
+            </Text>
+            <TextInput
+              editable={!isSubmitting}
+              placeholder={t("auth.register.password")}
+              placeholderTextColor={colors.textSubtle}
+              secureTextEntry
+              style={[styles.input, { textAlign: isRTL ? "right" : "left" }, isSubmitting && styles.inputDisabled]}
+              value={password}
+              onChangeText={setPassword}
+            />
+          </View>
+
           <Pressable disabled={isSubmitting} onPress={() => void handleSubmit()} style={styles.primaryButton}>
             {isSubmitting ? (
               <ActivityIndicator color={colors.surface} size="small" />
@@ -89,69 +107,81 @@ export default function RegisterScreen() {
               <Text style={styles.primaryButtonText}>{t("auth.register.submit")}</Text>
             )}
           </Pressable>
+
           {errorKey ? (
             <Text style={[styles.errorText, { textAlign: isRTL ? "right" : "left" }]}>
               {t(errorKey)}
             </Text>
           ) : null}
-          <Link href="/(auth)/login" style={[styles.link, { textAlign: isRTL ? "right" : "left" }]}>
-            {t("auth.register.hasAccount")}
-          </Link>
         </View>
-      </ScreenScaffold>
+
+        <Link href="/(auth)/login" style={styles.switchLink}>
+          {t("auth.register.hasAccount")}
+        </Link>
+      </AuthShell>
     </>
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: 20,
-    borderColor: colors.border,
-    borderWidth: 1,
-    padding: 18,
-    gap: 10,
-  },
-  label: {
-    color: colors.text,
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  input: {
-    minHeight: 48,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 14,
-    backgroundColor: colors.background,
-    paddingHorizontal: 14,
-    color: colors.textSubtle,
-  },
-  inputDisabled: {
-    opacity: 0.7,
-  },
-  primaryButton: {
-    minHeight: 48,
-    borderRadius: 14,
-    backgroundColor: colors.accent,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 4,
-  },
-  primaryButtonText: {
-    color: colors.surface,
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  errorText: {
-    color: colors.danger,
-    fontSize: 13,
-    lineHeight: 20,
-    marginTop: -2,
-  },
-  link: {
-    color: colors.accent,
-    fontSize: 14,
-    fontWeight: "700",
-    marginTop: 2,
-  },
-});
+const makeStyles = (c: ColorPalette) =>
+  StyleSheet.create({
+    card: {
+      backgroundColor: c.surface,
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor: c.border,
+      padding: 20,
+      gap: 16,
+    },
+    cardTitle: {
+      color: c.text,
+      fontSize: 20,
+      fontWeight: "700",
+    },
+    fieldGroup: {
+      gap: 6,
+    },
+    label: {
+      color: c.textMuted,
+      fontSize: 12,
+      fontWeight: "600",
+      letterSpacing: 0.3,
+    },
+    input: {
+      minHeight: 50,
+      borderWidth: 1,
+      borderColor: c.border,
+      borderRadius: 14,
+      backgroundColor: c.background,
+      paddingHorizontal: 14,
+      color: c.text,
+      fontSize: 15,
+    },
+    inputDisabled: {
+      opacity: 0.6,
+    },
+    primaryButton: {
+      minHeight: 52,
+      borderRadius: 16,
+      backgroundColor: c.primary,
+      alignItems: "center",
+      justifyContent: "center",
+      marginTop: 4,
+    },
+    primaryButtonText: {
+      color: c.surface,
+      fontSize: 16,
+      fontWeight: "700",
+    },
+    errorText: {
+      color: c.danger,
+      fontSize: 13,
+      lineHeight: 20,
+    },
+    switchLink: {
+      color: c.primary,
+      fontSize: 14,
+      fontWeight: "700",
+      textAlign: "center",
+    },
+  });

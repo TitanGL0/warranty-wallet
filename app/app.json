@@ -8,7 +8,13 @@
     "userInterfaceStyle": "light",
     "plugins": [
       "expo-router",
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Warranty Wallet to access your photos to attach receipts."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": false

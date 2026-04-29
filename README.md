@@ -5,7 +5,12 @@ Smart Warranty Wallet (`ארנק אחריות חכם`) is an Expo-based native i
 This repository now contains:
 
 - `_archive/web-mvp-v1/` with the original single-file web MVP preserved as-is
-- `app/` with the new Expo SDK 52 native foundation
+- `app/` with the Expo SDK 54 native app
 - `functions/` as the future Firebase Cloud Functions workspace stub
 
-The current milestone includes routing, Hebrew-first i18n, RTL/LTR switching, placeholder screens, and shared TypeScript models. Firebase, auth, and real data wiring land in later tasks.
+The current milestone includes Expo Router navigation, Hebrew-first i18n, RTL/LTR switching, Firebase Auth, Firestore-backed product CRUD, product price, temporary receipt attachment support, and month-based warranty tracking.
+
+Firebase setup notes:
+
+- Firestore must be enabled in the Firebase Console and use the rules from `app/firestore.rules`
+- Receipt attachment is currently MVP-temporary: the selected local image URI may be saved in Firestore as `receiptImageUrl` for preview convenience, but it is not uploaded to Firebase Storage yet

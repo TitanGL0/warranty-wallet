@@ -1,9 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { colors } from "../constants/colors";
+import { type ColorPalette } from "../constants/colors";
 import { useI18n } from "../hooks/useI18n";
+import { useThemeColors } from "../hooks/useThemeColors";
 import type { TranslationKey } from "../i18n/he";
 
 interface ScreenScaffoldProps {
@@ -25,10 +26,12 @@ export function ScreenScaffold({
   actionLabelKey,
   onActionPress,
 }: ScreenScaffoldProps) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { t, isRTL } = useI18n();
 
   return (
-    <View style={[styles.screen, { direction: isRTL ? "rtl" : "ltr" }]}>
+    <View style={styles.screen}>
       <View style={styles.heroCard}>
         <View style={styles.heroIconWrap}>
           <Ionicons color={colors.accent} name={iconName} size={26} />
@@ -50,50 +53,51 @@ export function ScreenScaffold({
   );
 }
 
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: colors.background,
-    padding: 16,
-    gap: 16,
-  },
-  heroCard: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 24,
-    padding: 20,
-    gap: 12,
-  },
-  heroIconWrap: {
-    width: 52,
-    height: 52,
-    borderRadius: 18,
-    backgroundColor: colors.accentSoft,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  title: {
-    color: colors.text,
-    fontSize: 24,
-    fontWeight: "700",
-  },
-  description: {
-    color: colors.textMuted,
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  primaryButton: {
-    minHeight: 48,
-    borderRadius: 16,
-    backgroundColor: colors.accent,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 18,
-  },
-  primaryButtonText: {
-    color: colors.surface,
-    fontSize: 15,
-    fontWeight: "700",
-  },
-});
+const makeStyles = (c: ColorPalette) =>
+  StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: c.background,
+      padding: 16,
+      gap: 16,
+    },
+    heroCard: {
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.border,
+      borderRadius: 24,
+      padding: 20,
+      gap: 12,
+    },
+    heroIconWrap: {
+      width: 52,
+      height: 52,
+      borderRadius: 18,
+      backgroundColor: c.accentSoft,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    title: {
+      color: c.text,
+      fontSize: 24,
+      fontWeight: "700",
+    },
+    description: {
+      color: c.textMuted,
+      fontSize: 15,
+      lineHeight: 22,
+    },
+    primaryButton: {
+      minHeight: 48,
+      borderRadius: 16,
+      backgroundColor: c.primary,
+      justifyContent: "center",
+      alignItems: "center",
+      paddingHorizontal: 18,
+    },
+    primaryButtonText: {
+      color: c.surface,
+      fontSize: 15,
+      fontWeight: "700",
+    },
+  });
