@@ -1,10 +1,14 @@
+import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker, { type DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Stack, router, useLocalSearchParams, type Href } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import {
   ActivityIndicator,
+  Alert,
   Image,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -16,6 +20,8 @@ import {
 } from "react-native";
 
 import { FormField } from "../../src/components/FormField";
+import { CATEGORY_LABEL_KEYS, CATEGORY_OPTIONS, type CategoryOption } from "../../src/constants/categories";
+import { getCategoryIcon } from "../../src/constants/categoryIcons";
 import { type ColorPalette } from "../../src/constants/colors";
 import { IMPORTERS } from "../../src/constants/importers";
 import { useProducts } from "../../src/hooks/useProducts";
@@ -25,31 +31,8 @@ import type { TranslationKey } from "../../src/i18n/he";
 import { addProduct, updateProduct } from "../../src/services/products";
 import { useAuthStore } from "../../src/store/authStore";
 import type { ProductInput } from "../../src/types";
+import { setCategoryPickerCallback } from "../../src/utils/categoryPickerCallback";
 import { formatDateDisplay, formatWarrantyDuration } from "../../src/utils/warranty";
-
-const CATEGORY_OPTIONS = [
-  "refrigerator",
-  "tv",
-  "washingMachine",
-  "smartphone",
-  "computer",
-  "headphones",
-  "ac",
-  "dishwasher",
-  "other",
-] as const;
-
-const CATEGORY_LABEL_KEYS = {
-  refrigerator: "category.refrigerator",
-  tv: "category.tv",
-  washingMachine: "category.washingMachine",
-  smartphone: "category.smartphone",
-  computer: "category.computer",
-  headphones: "category.headphones",
-  ac: "category.ac",
-  dishwasher: "category.dishwasher",
-  other: "category.other",
-} as const;
 
 const CURRENCY_OPTIONS = ["ILS", "USD", "EUR"] as const;
 const MIN_MONTHS = 1;
@@ -103,31 +86,6 @@ function toIsoDate(value: Date) {
   return `${year}-${month}-${day}`;
 }
 
-function startOfMonth(value: Date) {
-  return new Date(value.getFullYear(), value.getMonth(), 1);
-}
-
-function buildCalendarDays(monthDate: Date) {
-  const monthStart = startOfMonth(monthDate);
-  const firstWeekday = monthStart.getDay();
-  const daysInMonth = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
-  const cells: Array<Date | null> = [];
-
-  for (let index = 0; index < firstWeekday; index += 1) {
-    cells.push(null);
-  }
-
-  for (let day = 1; day <= daysInMonth; day += 1) {
-    cells.push(new Date(monthDate.getFullYear(), monthDate.getMonth(), day));
-  }
-
-  while (cells.length % 7 !== 0) {
-    cells.push(null);
-  }
-
-  return cells;
-}
-
 function parseOptionalPrice(value: string): number | null {
   if (!value.trim()) {
     return null;
@@ -152,9 +110,10 @@ export default function AddProductScreen() {
   const existingProduct = isEditMode ? products.find((product) => product.id === productId) ?? null : null;
   const [name, setName] = useState("");
   const [brand, setBrand] = useState("");
-  const [category, setCategory] = useState<(typeof CATEGORY_OPTIONS)[number]>("other");
+  const [category, setCategory] = useState<CategoryOption>("other");
   const [purchaseDate, setPurchaseDate] = useState("");
   const [warrantyMonths, setWarrantyMonths] = useState(12);
+  const [warrantyInput, setWarrantyInput] = useState("12");
   const [importer, setImporter] = useState("");
   const [importerPhone, setImporterPhone] = useState("");
   const [serial, setSerial] = useState("");
@@ -168,15 +127,16 @@ export default function AddProductScreen() {
   const [errorKey, setErrorKey] = useState<TranslationKey | null>(null);
   const [statusKey, setStatusKey] = useState<TranslationKey | null>(null);
   const [formReady, setFormReady] = useState(!isEditMode);
-  const [isCalendarVisible, setIsCalendarVisible] = useState(false);
-  const [tempSelectedDate, setTempSelectedDate] = useState("");
-  const [visibleMonth, setVisibleMonth] = useState(() => startOfMonth(new Date()));
+  const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
+  const [receiptPreviewVisible, setReceiptPreviewVisible] = useState(false);
+  const [tempSelectedDate, setTempSelectedDate] = useState(() => new Date());
   const [pendingNavigation, setPendingNavigation] = useState<NavigationTarget | null>(null);
   const mountedRef = useRef(true);
 
   useEffect(() => {
     return () => {
       mountedRef.current = false;
+      setCategoryPickerCallback(null);
     };
   }, []);
 
@@ -194,6 +154,7 @@ export default function AddProductScreen() {
     );
     setPurchaseDate(existingProduct.purchaseDate);
     setWarrantyMonths(existingProduct.warrantyMonths);
+    setWarrantyInput(String(existingProduct.warrantyMonths));
     setImporter(existingProduct.importer);
     setImporterPhone(existingProduct.importerPhone);
     setSerial(existingProduct.serial);
@@ -208,6 +169,10 @@ export default function AddProductScreen() {
     setExistingReceiptUrl(existingProduct.receiptImageUrl ?? null);
     setFormReady(true);
   }, [existingProduct, formReady, isEditMode]);
+
+  useEffect(() => {
+    setWarrantyInput(String(warrantyMonths));
+  }, [warrantyMonths]);
 
   useEffect(() => {
     if (isSubmitting || !pendingNavigation) {
@@ -234,16 +199,15 @@ export default function AddProductScreen() {
   }, [isSubmitting, pendingNavigation]);
 
   const inputStyle = [styles.input, { textAlign: isRTL ? "right" : "left" }] as const;
-  const monthNames = t("calendar.monthNames");
-  const weekDaysShort = t("calendar.weekDaysShort");
-  const calendarDays = useMemo(() => buildCalendarDays(visibleMonth), [visibleMonth]);
-  const selectedDisplayDate = purchaseDate ? formatDateDisplay(purchaseDate, language) : t("addProduct.datePlaceholder");
+  const selectedDisplayDate = purchaseDate ? formatDateDisplay(purchaseDate, language) : t("calendar.selectDate");
+  const selectedCategoryLabel = t(CATEGORY_LABEL_KEYS[category]);
+  const selectedCategoryIcon = getCategoryIcon(category);
+  const activeReceiptUri = receiptLocalUri ?? existingReceiptUrl;
 
   const openCalendar = () => {
     const baseDate = purchaseDate && isValidDate(purchaseDate) ? parseIsoDate(purchaseDate) : new Date();
-    setTempSelectedDate(toIsoDate(baseDate));
-    setVisibleMonth(startOfMonth(baseDate));
-    setIsCalendarVisible(true);
+    setTempSelectedDate(baseDate);
+    setIsDatePickerVisible(true);
   };
 
   const handleImporterBlur = () => {
@@ -259,13 +223,88 @@ export default function AddProductScreen() {
     }
   };
 
-  const handlePickImage = async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  const openCategoryPicker = () => {
+    setCategoryPickerCallback((nextCategory) => {
+      setCategory(nextCategory);
+    });
+    router.push(`/product/category-picker?selected=${encodeURIComponent(category)}`);
+  };
 
-    if (!permission.granted) {
-      setErrorKey("error.product.receiptPermissionDenied");
+  const clampWarrantyMonths = (value: number) => Math.min(MAX_MONTHS, Math.max(MIN_MONTHS, value));
+
+  const handleWarrantyInputChange = (value: string) => {
+    const numericValue = value.replace(/\D/g, "").slice(0, 3);
+    setWarrantyInput(numericValue);
+
+    if (!numericValue) {
       return;
     }
+
+    setWarrantyMonths(clampWarrantyMonths(Number.parseInt(numericValue, 10)));
+  };
+
+  const handleWarrantyInputBlur = () => {
+    if (!warrantyInput.trim()) {
+      setWarrantyMonths(MIN_MONTHS);
+      setWarrantyInput(String(MIN_MONTHS));
+      return;
+    }
+
+    const parsed = Number.parseInt(warrantyInput, 10);
+    const nextValue = Number.isNaN(parsed) ? MIN_MONTHS : clampWarrantyMonths(parsed);
+    setWarrantyMonths(nextValue);
+    setWarrantyInput(String(nextValue));
+  };
+
+  const handleDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    if (Platform.OS === "android") {
+      setIsDatePickerVisible(false);
+
+      if (event.type === "set" && selectedDate) {
+        setPurchaseDate(toIsoDate(selectedDate));
+        setStatusKey(null);
+      }
+
+      return;
+    }
+
+    if (selectedDate) {
+      setTempSelectedDate(selectedDate);
+    }
+  };
+
+  const confirmDateSelection = () => {
+    setPurchaseDate(toIsoDate(tempSelectedDate));
+    setStatusKey(null);
+    setIsDatePickerVisible(false);
+  };
+
+  const handlePickImage = async () => {
+    let permission = await ImagePicker.getMediaLibraryPermissionsAsync();
+
+    if (permission.status !== "granted" && permission.canAskAgain !== false) {
+      permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    }
+
+    if (permission.status !== "granted") {
+      setErrorKey("error.product.receiptPermissionDenied");
+
+      if (permission.canAskAgain === false) {
+        Alert.alert(t("common.error"), t("error.product.receiptPermissionDenied"), [
+          { text: t("common.cancel"), style: "cancel" },
+          {
+            text: t("common.openSettings"),
+            onPress: () => {
+              void Linking.openSettings();
+            },
+          },
+        ]);
+      }
+
+      return;
+    }
+
+    setErrorKey(null);
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
@@ -364,17 +403,24 @@ export default function AddProductScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: isEditMode ? t("editProduct.title") : t("addProduct.title") }} />
+      <Stack.Screen
+        options={
+          {
+            title: isEditMode ? t("editProduct.title") : t("addProduct.title"),
+            headerBackTitleVisible: false,
+            headerBackTitle: "",
+            headerBackButtonDisplayMode: "minimal",
+          } as unknown as Parameters<typeof Stack.Screen>[0]["options"]
+        }
+      />
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.screen}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          <Text style={[styles.description, { textAlign: isRTL ? "right" : "left" }]}>{t("addProduct.description")}</Text>
-
           <SectionLabel isRTL={isRTL} title={t("addProduct.sectionProductInfo")} />
           <View style={styles.sectionCard}>
             <FormField label={t("product.name")} required>
               <TextInput
                 editable={!isSubmitting}
-                placeholder={t("product.name")}
+                placeholder={t("addProduct.placeholder.name")}
                 placeholderTextColor={colors.textSubtle}
                 style={[...inputStyle, isSubmitting && styles.inputDisabled]}
                 value={name}
@@ -388,7 +434,7 @@ export default function AddProductScreen() {
             <FormField label={t("product.brand")}>
               <TextInput
                 editable={!isSubmitting}
-                placeholder={t("product.brand")}
+                placeholder={t("addProduct.placeholder.brand")}
                 placeholderTextColor={colors.textSubtle}
                 style={[...inputStyle, isSubmitting && styles.inputDisabled]}
                 value={brand}
@@ -397,22 +443,17 @@ export default function AddProductScreen() {
             </FormField>
 
             <FormField label={t("product.category")}>
-              <View style={[styles.chipWrap, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
-                {CATEGORY_OPTIONS.map((option) => {
-                  const selected = option === category;
-
-                  return (
-                    <Pressable
-                      key={option}
-                      disabled={isSubmitting}
-                      onPress={() => setCategory(option)}
-                      style={[styles.chip, selected && styles.chipSelected]}
-                    >
-                      <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{t(CATEGORY_LABEL_KEYS[option])}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
+              <Pressable
+                disabled={isSubmitting}
+                onPress={openCategoryPicker}
+                style={[styles.categoryRow, { flexDirection: isRTL ? "row-reverse" : "row" }, isSubmitting && styles.inputDisabled]}
+              >
+                <View style={[styles.categoryIconWrap, { backgroundColor: colors.primarySoft }]}>
+                  <Ionicons color={colors.primary} name={selectedCategoryIcon} size={18} />
+                </View>
+                <Text style={[styles.categoryValue, { textAlign: isRTL ? "right" : "left" }]}>{selectedCategoryLabel}</Text>
+                <Ionicons color={colors.textSubtle} name={isRTL ? "chevron-back" : "chevron-forward"} size={18} />
+              </Pressable>
             </FormField>
           </View>
 
@@ -420,15 +461,23 @@ export default function AddProductScreen() {
           <View style={styles.sectionCard}>
             <FormField label={t("product.purchaseDate")} required>
               <Pressable disabled={isSubmitting} onPress={openCalendar} style={[styles.dateField, isSubmitting && styles.inputDisabled]}>
-                <Text
-                  style={[
-                    styles.dateFieldText,
-                    !purchaseDate && styles.dateFieldPlaceholder,
-                    { textAlign: isRTL ? "right" : "left" },
-                  ]}
-                >
-                  {selectedDisplayDate}
-                </Text>
+                <View style={[styles.dateFieldContent, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+                  <View style={[styles.dateFieldIconWrap, { backgroundColor: colors.primarySoft }]}>
+                    <Ionicons color={colors.primary} name="calendar-outline" size={18} />
+                  </View>
+                  <View style={styles.dateFieldTextWrap}>
+                    <Text
+                      style={[
+                        styles.dateFieldText,
+                        !purchaseDate && styles.dateFieldPlaceholder,
+                        { textAlign: isRTL ? "right" : "left" },
+                      ]}
+                    >
+                      {selectedDisplayDate}
+                    </Text>
+                  </View>
+                  <Ionicons color={colors.textSubtle} name={isRTL ? "chevron-back" : "chevron-forward"} size={18} />
+                </View>
               </Pressable>
             </FormField>
 
@@ -441,7 +490,17 @@ export default function AddProductScreen() {
                 >
                   <Text style={styles.stepperBtnText}>-</Text>
                 </Pressable>
-                <Text style={styles.stepperValue}>{formatWarrantyDuration(warrantyMonths, language)}</Text>
+                <TextInput
+                  editable={!isSubmitting}
+                  keyboardType="numeric"
+                  maxLength={3}
+                  selectTextOnFocus
+                  style={[styles.stepperValueInput, isSubmitting && styles.inputDisabled]}
+                  textAlign="center"
+                  value={warrantyInput}
+                  onBlur={handleWarrantyInputBlur}
+                  onChangeText={handleWarrantyInputChange}
+                />
                 <Pressable
                   disabled={isSubmitting || warrantyMonths >= MAX_MONTHS}
                   onPress={() => setWarrantyMonths((current) => Math.min(MAX_MONTHS, current + 1))}
@@ -450,6 +509,9 @@ export default function AddProductScreen() {
                   <Text style={styles.stepperBtnText}>+</Text>
                 </Pressable>
               </View>
+              <Text style={[styles.stepperHint, { textAlign: isRTL ? "right" : "left" }]}>
+                {formatWarrantyDuration(warrantyMonths, language)}
+              </Text>
             </FormField>
           </View>
 
@@ -458,7 +520,7 @@ export default function AddProductScreen() {
             <FormField label={t("product.importer")}>
               <TextInput
                 editable={!isSubmitting}
-                placeholder={t("product.importer")}
+                placeholder={t("addProduct.placeholder.importer")}
                 placeholderTextColor={colors.textSubtle}
                 style={[...inputStyle, isSubmitting && styles.inputDisabled]}
                 value={importer}
@@ -471,7 +533,7 @@ export default function AddProductScreen() {
               <TextInput
                 editable={!isSubmitting}
                 keyboardType="phone-pad"
-                placeholder={t("product.importerPhone")}
+                placeholder={t("addProduct.placeholder.importerPhone")}
                 placeholderTextColor={colors.textSubtle}
                 style={[...inputStyle, isSubmitting && styles.inputDisabled]}
                 value={importerPhone}
@@ -482,7 +544,7 @@ export default function AddProductScreen() {
             <FormField label={t("product.serial")}>
               <TextInput
                 editable={!isSubmitting}
-                placeholder={t("product.serial")}
+                placeholder={t("addProduct.placeholder.serial")}
                 placeholderTextColor={colors.textSubtle}
                 style={[...inputStyle, isSubmitting && styles.inputDisabled]}
                 value={serial}
@@ -494,7 +556,7 @@ export default function AddProductScreen() {
               <TextInput
                 editable={!isSubmitting}
                 keyboardType="numeric"
-                placeholder={t("product.imei")}
+                placeholder={t("addProduct.placeholder.imei")}
                 placeholderTextColor={colors.textSubtle}
                 style={[...inputStyle, isSubmitting && styles.inputDisabled]}
                 value={imei}
@@ -506,7 +568,7 @@ export default function AddProductScreen() {
               <TextInput
                 editable={!isSubmitting}
                 multiline
-                placeholder={t("product.notes")}
+                placeholder={t("addProduct.placeholder.notes")}
                 placeholderTextColor={colors.textSubtle}
                 style={[...inputStyle, styles.notesInput, isSubmitting && styles.inputDisabled]}
                 textAlignVertical="top"
@@ -548,7 +610,9 @@ export default function AddProductScreen() {
             <FormField label={t("product.receipt")}>
               {receiptLocalUri ? (
                 <View style={styles.receiptPreview}>
-                  <Image resizeMode="cover" source={{ uri: receiptLocalUri }} style={styles.receiptImage} />
+                  <Pressable onPress={() => setReceiptPreviewVisible(true)}>
+                    <Image resizeMode="cover" source={{ uri: receiptLocalUri }} style={styles.receiptImage} />
+                  </Pressable>
                   <Pressable
                     onPress={() => {
                       setReceiptLocalUri(null);
@@ -560,7 +624,9 @@ export default function AddProductScreen() {
                 </View>
               ) : existingReceiptUrl ? (
                 <View style={styles.receiptPreview}>
-                  <Image resizeMode="cover" source={{ uri: existingReceiptUrl }} style={styles.receiptImage} />
+                  <Pressable onPress={() => setReceiptPreviewVisible(true)}>
+                    <Image resizeMode="cover" source={{ uri: existingReceiptUrl }} style={styles.receiptImage} />
+                  </Pressable>
                   <Pressable
                     onPress={() => {
                       setExistingReceiptUrl(null);
@@ -587,71 +653,56 @@ export default function AddProductScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      <Modal animationType="fade" transparent visible={isCalendarVisible}>
+      {Platform.OS === "android" && isDatePickerVisible ? (
+        <DateTimePicker display="default" mode="date" value={tempSelectedDate} onChange={handleDateChange} />
+      ) : null}
+
+      <Modal animationType="fade" transparent visible={Platform.OS === "ios" && isDatePickerVisible}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
+            <View style={styles.modalHandle} />
             <Text style={[styles.modalTitle, { textAlign: isRTL ? "right" : "left" }]}>{t("calendar.selectDate")}</Text>
+            <Text style={[styles.modalSubtitle, { textAlign: isRTL ? "right" : "left" }]}>
+              {formatDateDisplay(toIsoDate(tempSelectedDate), language)}
+            </Text>
 
-            <View style={[styles.monthHeader, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
-              <Pressable onPress={() => setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))} style={styles.monthButton}>
-                <Text style={styles.monthButtonText}>{t("calendar.previousMonth")}</Text>
-              </Pressable>
-              <Text style={styles.monthLabel}>
-                {monthNames[visibleMonth.getMonth()]} {visibleMonth.getFullYear()}
-              </Text>
-              <Pressable onPress={() => setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))} style={styles.monthButton}>
-                <Text style={styles.monthButtonText}>{t("calendar.nextMonth")}</Text>
-              </Pressable>
-            </View>
-
-            <View style={[styles.weekDaysRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
-              {weekDaysShort.map((day) => (
-                <Text key={day} style={styles.weekDayText}>
-                  {day}
-                </Text>
-              ))}
-            </View>
-
-            <View style={styles.calendarGrid}>
-              {calendarDays.map((date, index) => {
-                if (!date) {
-                  return <View key={`empty-${index}`} style={styles.dayCell} />;
-                }
-
-                const isoDate = toIsoDate(date);
-                const selected = isoDate === tempSelectedDate;
-
-                return (
-                  <Pressable key={isoDate} onPress={() => setTempSelectedDate(isoDate)} style={[styles.dayCell, styles.dayButton, selected && styles.dayButtonSelected]}>
-                    <Text style={[styles.dayText, selected && styles.dayTextSelected]}>{date.getDate()}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+            <DateTimePicker
+              display="inline"
+              mode="date"
+              style={styles.iosDatePicker}
+              themeVariant={colors.background === "#0f0f10" ? "dark" : "light"}
+              value={tempSelectedDate}
+              onChange={handleDateChange}
+            />
 
             <View style={[styles.modalActions, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
               <Pressable
                 onPress={() => {
-                  setIsCalendarVisible(false);
+                  setIsDatePickerVisible(false);
                 }}
                 style={styles.secondaryButton}
               >
                 <Text style={styles.secondaryButtonText}>{t("calendar.cancel")}</Text>
               </Pressable>
-              <Pressable
-                onPress={() => {
-                  if (tempSelectedDate) {
-                    setPurchaseDate(tempSelectedDate);
-                    setStatusKey(null);
-                  }
-                  setIsCalendarVisible(false);
-                }}
-                style={styles.primaryModalButton}
-              >
+              <Pressable onPress={confirmDateSelection} style={styles.primaryModalButton}>
                 <Text style={styles.primaryModalButtonText}>{t("calendar.confirm")}</Text>
               </Pressable>
             </View>
           </View>
+        </View>
+      </Modal>
+
+      <Modal animationType="fade" transparent visible={receiptPreviewVisible}>
+        <View style={styles.receiptPreviewOverlay}>
+          <Pressable
+            onPress={() => {
+              setReceiptPreviewVisible(false);
+            }}
+            style={[styles.receiptPreviewClose, { alignSelf: isRTL ? "flex-start" : "flex-end" }]}
+          >
+            <Text style={styles.receiptPreviewCloseText}>{t("common.cancel")}</Text>
+          </Pressable>
+          {activeReceiptUri ? <Image resizeMode="contain" source={{ uri: activeReceiptUri }} style={styles.receiptPreviewFullscreenImage} /> : null}
         </View>
       </Modal>
     </>
@@ -739,11 +790,6 @@ const makeStyles = (c: ColorPalette) =>
     fontSize: 14,
     fontWeight: "700",
   },
-  description: {
-    color: c.textMuted,
-    fontSize: 14,
-    lineHeight: 22,
-  },
   sectionLabel: {
     color: c.textSubtle,
     fontSize: 11,
@@ -769,7 +815,7 @@ const makeStyles = (c: ColorPalette) =>
     color: c.text,
   },
   dateField: {
-    minHeight: 48,
+    minHeight: 56,
     borderWidth: 1,
     borderColor: c.border,
     borderRadius: 14,
@@ -777,12 +823,29 @@ const makeStyles = (c: ColorPalette) =>
     paddingHorizontal: 14,
     justifyContent: "center",
   },
+  dateFieldContent: {
+    alignItems: "center",
+    gap: 12,
+  },
+  dateFieldIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  dateFieldTextWrap: {
+    flex: 1,
+  },
   dateFieldText: {
     color: c.text,
-    fontSize: 14,
+    fontSize: 15,
+    fontWeight: "600",
   },
   dateFieldPlaceholder: {
     color: c.textSubtle,
+    fontWeight: "500",
   },
   inputDisabled: {
     opacity: 0.7,
@@ -817,14 +880,28 @@ const makeStyles = (c: ColorPalette) =>
     fontWeight: "600",
     textAlign: "center",
   },
+  stepperValueInput: {
+    minWidth: 72,
+    minHeight: 44,
+    borderWidth: 1,
+    borderColor: c.border,
+    borderRadius: 12,
+    backgroundColor: c.background,
+    paddingHorizontal: 12,
+    color: c.text,
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  stepperHint: {
+    color: c.textMuted,
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 8,
+  },
   notesInput: {
     minHeight: 112,
     paddingTop: 14,
     paddingBottom: 14,
-  },
-  chipWrap: {
-    flexWrap: "wrap",
-    gap: 8,
   },
   chip: {
     borderRadius: 999,
@@ -845,6 +922,29 @@ const makeStyles = (c: ColorPalette) =>
   },
   chipTextSelected: {
     color: c.surface,
+  },
+  categoryRow: {
+    minHeight: 56,
+    borderWidth: 1,
+    borderColor: c.border,
+    borderRadius: 14,
+    backgroundColor: c.background,
+    paddingHorizontal: 14,
+    alignItems: "center",
+    gap: 12,
+  },
+  categoryIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  categoryValue: {
+    flex: 1,
+    color: c.text,
+    fontSize: 14,
   },
   priceRow: {
     alignItems: "flex-start",
@@ -882,6 +982,29 @@ const makeStyles = (c: ColorPalette) =>
     width: "100%",
     height: 160,
     borderRadius: 12,
+  },
+  receiptPreviewOverlay: {
+    flex: 1,
+    backgroundColor: "#000000",
+    padding: 20,
+    justifyContent: "center",
+  },
+  receiptPreviewClose: {
+    position: "absolute",
+    top: 56,
+    left: 20,
+    right: 20,
+    zIndex: 1,
+    paddingVertical: 8,
+  },
+  receiptPreviewCloseText: {
+    color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  receiptPreviewFullscreenImage: {
+    width: "100%",
+    height: "100%",
   },
   removeReceiptBtn: {
     alignSelf: "flex-start",
@@ -927,65 +1050,26 @@ const makeStyles = (c: ColorPalette) =>
     padding: 18,
     gap: 16,
   },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 999,
+    backgroundColor: c.border,
+    alignSelf: "center",
+  },
   modalTitle: {
     color: c.text,
     fontSize: 18,
     fontWeight: "700",
   },
-  monthHeader: {
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
-  },
-  monthButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-  },
-  monthButtonText: {
-    color: c.primary,
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  monthLabel: {
-    flex: 1,
-    color: c.text,
-    fontSize: 16,
-    fontWeight: "700",
-    textAlign: "center",
-  },
-  weekDaysRow: {
-    justifyContent: "space-between",
-  },
-  weekDayText: {
-    flex: 1,
-    color: c.textSubtle,
-    fontSize: 12,
-    fontWeight: "700",
-    textAlign: "center",
-  },
-  calendarGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-  },
-  dayCell: {
-    width: "14.2857%",
-    aspectRatio: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  dayButton: {
-    borderRadius: 12,
-  },
-  dayButtonSelected: {
-    backgroundColor: c.primary,
-  },
-  dayText: {
-    color: c.text,
+  modalSubtitle: {
+    color: c.textMuted,
     fontSize: 14,
-    fontWeight: "600",
+    lineHeight: 20,
+    marginTop: -8,
   },
-  dayTextSelected: {
-    color: c.surface,
+  iosDatePicker: {
+    alignSelf: "stretch",
   },
   modalActions: {
     gap: 10,

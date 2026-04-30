@@ -154,25 +154,6 @@ export default function SettingsScreen() {
             subtitle={t("settings.exportData.description")}
             title={t("settings.exportData")}
           />
-          <Row
-            destructive
-            icon="trash-outline"
-            onPress={() => {
-              Alert.alert(t("settings.clearData.confirmTitle"), t("settings.clearData.confirmMessage"), [
-                { text: t("common.cancel"), style: "cancel" },
-                {
-                  text: t("settings.clearData.confirmAction"),
-                  style: "destructive",
-                  onPress: () => {
-                    console.log("[Settings] clear data action not implemented yet");
-                  },
-                },
-              ]);
-            }}
-            rtl={isRTL}
-            subtitle={t("settings.clearData.description")}
-            title={t("settings.clearData")}
-          />
         </SettingsCard>
 
         <Text style={[styles.sectionLabel, { textAlign: isRTL ? "right" : "left" }]}>{t("settings.section.account")}</Text>

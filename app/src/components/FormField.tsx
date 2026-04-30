@@ -35,7 +35,6 @@ const makeStyles = (c: ColorPalette) =>
     labelRow: {
       gap: 4,
       alignItems: "center",
-      alignSelf: "flex-start",
     },
     label: {
       color: c.text,

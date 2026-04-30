@@ -128,6 +128,8 @@ export default function RootLayout() {
     headerTitleStyle: { fontSize: 18, fontWeight: "600" as const },
     headerShadowVisible: false,
     headerBackTitleVisible: false,
+    headerBackTitle: "",
+    headerBackButtonDisplayMode: "minimal",
   } as unknown as Parameters<typeof Stack>[0]["screenOptions"];
 
   return (
@@ -137,6 +139,7 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="product/add" options={{ title: t("addProduct.title"), headerShown: true }} />
+        <Stack.Screen name="product/category-picker" options={{ title: t("addProduct.categoryPickerTitle"), headerShown: true }} />
         <Stack.Screen name="product/[id]" options={{ title: t("productDetail.title"), headerShown: true }} />
         <Stack.Screen name="products" options={{ title: t("home.title"), headerShown: true }} />
       </Stack>

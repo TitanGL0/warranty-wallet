@@ -14,7 +14,8 @@
         {
           "photosPermission": "Allow Warranty Wallet to access your photos to attach receipts."
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": false

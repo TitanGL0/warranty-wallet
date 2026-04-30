@@ -6,9 +6,22 @@ function parseIsoDate(dateStr: string) {
   return new Date(year, (month ?? 1) - 1, day ?? 1);
 }
 
+function getDaysInMonth(year: number, monthIndex: number) {
+  return new Date(year, monthIndex + 1, 0).getDate();
+}
+
+function addMonthsClamped(date: Date, monthsToAdd: number) {
+  const originalDay = date.getDate();
+  const targetMonthIndex = date.getMonth() + monthsToAdd;
+  const targetYear = date.getFullYear() + Math.floor(targetMonthIndex / 12);
+  const normalizedMonthIndex = ((targetMonthIndex % 12) + 12) % 12;
+  const targetDay = Math.min(originalDay, getDaysInMonth(targetYear, normalizedMonthIndex));
+
+  return new Date(targetYear, normalizedMonthIndex, targetDay);
+}
+
 export function computeWarrantyEnd(purchaseDate: string, warrantyMonths: number): string {
-  const date = parseIsoDate(purchaseDate);
-  date.setMonth(date.getMonth() + warrantyMonths);
+  const date = addMonthsClamped(parseIsoDate(purchaseDate), warrantyMonths);
 
   const year = date.getFullYear();
   const month = `${date.getMonth() + 1}`.padStart(2, "0");
