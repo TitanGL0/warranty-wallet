@@ -24,6 +24,7 @@ export default function HomeScreen() {
   const expiringSoon = useMemo(() => products.filter((product) => product.status === "expiringSoon"), [products]);
   const expired = useMemo(() => products.filter((product) => product.status === "expired"), [products]);
   const recentProducts = useMemo(() => products.slice(0, 3), [products]);
+  const hasProducts = products.length > 0;
 
   if (isLoading) {
     return (
@@ -63,13 +64,15 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      <View style={[styles.statsRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
-        <StatCard icon="checkmark-circle" iconColor={colors.accent} label={t("home.stats.total")} value={products.length} />
-        <StatCard icon="alert-circle" iconColor={colors.warning} label={t("home.stats.expiringSoon")} value={expiringSoon.length} />
-        <StatCard icon="close-circle" iconColor={colors.danger} label={t("home.stats.expired")} value={expired.length} />
-      </View>
+      {hasProducts ? (
+        <View style={[styles.statsRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+          <StatCard icon="checkmark-circle" iconColor={colors.accent} label={t("home.stats.total")} value={products.length} />
+          <StatCard icon="alert-circle" iconColor={colors.warning} label={t("home.stats.expiringSoon")} value={expiringSoon.length} />
+          <StatCard icon="close-circle" iconColor={colors.danger} label={t("home.stats.expired")} value={expired.length} />
+        </View>
+      ) : null}
 
-      {!isLoading && products.length > 0 ? (
+      {!isLoading && hasProducts ? (
         <View style={styles.section}>
           <SectionHeader
             actionLabel={t("home.viewAll")}
@@ -94,48 +97,50 @@ export default function HomeScreen() {
         </View>
       ) : null}
 
-      <View style={styles.section}>
-        <SectionHeader isRTL={isRTL} title={t("home.expiringSoon")} />
+      {!hasProducts ? (
+        <View style={styles.emptyStateWrap}>
+          <View style={styles.emptyStateIcon}>
+            <Ionicons color={colors.primary} name="shield-checkmark-outline" size={42} />
+          </View>
+          <Text style={styles.emptyStateTitle}>{t("home.empty.title")}</Text>
+          <Text style={styles.emptyStateDescription}>{t("home.empty.description")}</Text>
+          <Pressable
+            onPress={() => {
+              router.push("/product/add");
+            }}
+            style={styles.emptyStateButton}
+          >
+            <Text style={styles.emptyStateButtonText}>{t("home.addProduct")}</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <View style={styles.section}>
+          <SectionHeader isRTL={isRTL} title={t("home.expiringSoon")} />
 
-        {products.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <View style={styles.emptyIcon}>
-              <Ionicons color={colors.accent} name="document-text-outline" size={32} />
+          {expiringSoon.length > 0 ? (
+            <View style={styles.cardList}>
+              {expiringSoon.map((product) => (
+                <DashboardProductCard
+                  key={product.id}
+                  language={language}
+                  product={product}
+                  onPress={() => {
+                    router.push(`/product/${product.id}`);
+                  }}
+                />
+              ))}
             </View>
-            <Text style={[styles.emptyTitle, { textAlign: isRTL ? "right" : "left" }]}>{t("home.empty.title")}</Text>
-            <Text style={[styles.emptyDescription, { textAlign: isRTL ? "right" : "left" }]}>{t("home.empty.description")}</Text>
-            <Pressable
-              onPress={() => {
-                router.push("/product/add");
-              }}
-              style={styles.emptyButton}
-            >
-              <Text style={styles.emptyButtonText}>{t("home.addProduct")}</Text>
-            </Pressable>
-          </View>
-        ) : expiringSoon.length > 0 ? (
-          <View style={styles.cardList}>
-            {expiringSoon.map((product) => (
-              <DashboardProductCard
-                key={product.id}
-                language={language}
-                product={product}
-                onPress={() => {
-                  router.push(`/product/${product.id}`);
-                }}
-              />
-            ))}
-          </View>
-        ) : (
-          <View style={styles.goodCard}>
-            <View style={styles.goodIcon}>
-              <Ionicons color={colors.accent} name="checkmark-done-outline" size={28} />
+          ) : (
+            <View style={styles.goodCard}>
+              <View style={styles.goodIcon}>
+                <Ionicons color={colors.accent} name="checkmark-done-outline" size={28} />
+              </View>
+              <Text style={[styles.goodTitle, { textAlign: isRTL ? "right" : "left" }]}>{t("home.allGood")}</Text>
+              <Text style={[styles.goodDescription, { textAlign: isRTL ? "right" : "left" }]}>{t("home.allGoodDesc")}</Text>
             </View>
-            <Text style={[styles.goodTitle, { textAlign: isRTL ? "right" : "left" }]}>{t("home.allGood")}</Text>
-            <Text style={[styles.goodDescription, { textAlign: isRTL ? "right" : "left" }]}>{t("home.allGoodDesc")}</Text>
-          </View>
-        )}
-      </View>
+          )}
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -221,6 +226,48 @@ const makeStyles = (c: ColorPalette) =>
     cardList: {
       gap: 12,
     },
+    emptyStateWrap: {
+      minHeight: 360,
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 16,
+      paddingHorizontal: 20,
+    },
+    emptyStateIcon: {
+      width: 88,
+      height: 88,
+      borderRadius: 30,
+      backgroundColor: c.primarySoft,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    emptyStateTitle: {
+      color: c.text,
+      fontSize: 24,
+      fontWeight: "800",
+      textAlign: "center",
+    },
+    emptyStateDescription: {
+      color: c.textMuted,
+      fontSize: 15,
+      lineHeight: 24,
+      textAlign: "center",
+      maxWidth: 320,
+    },
+    emptyStateButton: {
+      minHeight: 48,
+      borderRadius: 16,
+      backgroundColor: c.primary,
+      paddingHorizontal: 20,
+      alignItems: "center",
+      justifyContent: "center",
+      marginTop: 4,
+    },
+    emptyStateButtonText: {
+      color: c.surface,
+      fontSize: 15,
+      fontWeight: "700",
+    },
     goodCard: {
       backgroundColor: c.surface,
       borderRadius: 24,
@@ -249,48 +296,5 @@ const makeStyles = (c: ColorPalette) =>
       color: c.textMuted,
       fontSize: 14,
       lineHeight: 22,
-    },
-    emptyCard: {
-      backgroundColor: c.surface,
-      borderRadius: 24,
-      borderWidth: 1,
-      borderColor: c.border,
-      padding: 20,
-      alignItems: "center",
-      gap: 12,
-    },
-    emptyIcon: {
-      width: 72,
-      height: 72,
-      borderRadius: 24,
-      backgroundColor: c.accentSoft,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    emptyTitle: {
-      color: c.text,
-      fontSize: 18,
-      fontWeight: "700",
-      alignSelf: "stretch",
-    },
-    emptyDescription: {
-      color: c.textMuted,
-      fontSize: 14,
-      lineHeight: 22,
-      alignSelf: "stretch",
-    },
-    emptyButton: {
-      minWidth: 180,
-      minHeight: 50,
-      borderRadius: 16,
-      backgroundColor: c.primary,
-      justifyContent: "center",
-      alignItems: "center",
-      paddingHorizontal: 20,
-    },
-    emptyButtonText: {
-      color: c.surface,
-      fontSize: 15,
-      fontWeight: "700",
     },
   });

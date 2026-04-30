@@ -27,7 +27,7 @@ const CSV_HEADERS = [
   "importer",
   "importerPhone",
   "notes",
-  "receiptImageUrl",
+  "hasReceipt",
 ];
 
 export async function exportProductsToCSV(products: Product[], shareTitle: string): Promise<void> {
@@ -47,7 +47,7 @@ export async function exportProductsToCSV(products: Product[], shareTitle: strin
       p.importer,
       p.importerPhone,
       p.notes,
-      p.receiptImageUrl,
+      p.receiptImageUrl ? "yes" : "no",
     ]
       .map(escapeCsv)
       .join(","),

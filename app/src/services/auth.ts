@@ -12,6 +12,7 @@ import {
 import { createUserProfile } from "./firestore";
 import { firebaseAuth } from "./firebase";
 import type { TranslationKey } from "../i18n/he";
+import type { Language } from "../types";
 
 interface I18nError {
   i18nKey: TranslationKey;
@@ -51,6 +52,7 @@ export async function registerWithEmail(
   email: string,
   password: string,
   displayName: string,
+  language: Language,
 ): Promise<User> {
   try {
     const userCredential = await createUserWithEmailAndPassword(firebaseAuth, email, password);
@@ -58,7 +60,7 @@ export async function registerWithEmail(
     await createUserProfile(userCredential.user.uid, {
       email,
       displayName,
-      language: "he",
+      language,
     });
     return userCredential.user;
   } catch (error) {

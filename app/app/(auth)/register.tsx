@@ -12,7 +12,7 @@ import { registerWithEmail } from "../../src/services/auth";
 export default function RegisterScreen() {
   const colors = useThemeColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { t, isRTL } = useI18n();
+  const { t, isRTL, language } = useI18n();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -34,7 +34,7 @@ export default function RegisterScreen() {
     setErrorKey(null);
 
     try {
-      await registerWithEmail(email.trim(), password, name.trim());
+      await registerWithEmail(email.trim(), password, name.trim(), language);
     } catch (error) {
       const nextErrorKey =
         typeof error === "object" && error !== null && "i18nKey" in error

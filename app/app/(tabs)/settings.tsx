@@ -28,12 +28,16 @@ export default function SettingsScreen() {
   const profile = useAuthStore((state) => state.profile);
   const user = useAuthStore((state) => state.user);
   const signOut = useAuthStore((state) => state.signOut);
-  const { products } = useProducts();
+  const { products, isLoading: productsLoading } = useProducts();
   const [isExporting, setIsExporting] = useState(false);
   const languageOptions: Language[] = ["he", "en"];
   const displayName = profile?.displayName || user?.displayName || "";
 
   const handleExport = async () => {
+    if (productsLoading) {
+      return;
+    }
+
     if (products.length === 0) {
       Alert.alert(t("settings.export.noProducts"), t("settings.export.noProductsMsg"));
       return;
@@ -148,7 +152,7 @@ export default function SettingsScreen() {
         <SettingsCard>
           <Row
             icon="download-outline"
-            loading={isExporting}
+            loading={isExporting || productsLoading}
             onPress={handleExport}
             rtl={isRTL}
             subtitle={t("settings.exportData.description")}

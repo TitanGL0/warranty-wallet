@@ -13,6 +13,7 @@ import {
 import type { Unsubscribe } from "firebase/firestore";
 
 import { db } from "./firebase";
+import { copyReceiptToDocuments, deleteLocalReceipt } from "./receiptStorage";
 import { computeWarrantyEnd, computeWarrantyStatus } from "../utils/warranty";
 import type { Product, ProductInput } from "../types";
 
@@ -52,7 +53,15 @@ export async function addProduct(
   receiptLocalUri?: string | null,
 ): Promise<string> {
   const productDocRef = doc(collection(db, "users", uid, "products"));
-  const receiptImageUrl = receiptLocalUri ?? null;
+  let receiptImageUrl: string | null = null;
+
+  if (receiptLocalUri) {
+    try {
+      receiptImageUrl = await copyReceiptToDocuments(receiptLocalUri, productDocRef.id);
+    } catch {
+      receiptImageUrl = null;
+    }
+  }
 
   await setDoc(productDocRef, {
     ...input,
@@ -66,8 +75,9 @@ export async function addProduct(
   return productDocRef.id;
 }
 
-export async function deleteProduct(uid: string, productId: string): Promise<void> {
+export async function deleteProduct(uid: string, productId: string, receiptUrl?: string | null): Promise<void> {
   await deleteDoc(doc(db, "users", uid, "products", productId));
+  await deleteLocalReceipt(receiptUrl);
 }
 
 export async function updateProduct(
@@ -76,8 +86,21 @@ export async function updateProduct(
   input: Omit<ProductInput, "receiptImageUrl">,
   receiptLocalUri?: string | null,
   existingReceiptUrl?: string | null,
+  originalReceiptUrl?: string | null,
 ): Promise<void> {
-  const receiptImageUrl = receiptLocalUri ?? existingReceiptUrl ?? null;
+  let receiptImageUrl = existingReceiptUrl ?? null;
+
+  if (receiptLocalUri) {
+    try {
+      await deleteLocalReceipt(originalReceiptUrl);
+      receiptImageUrl = await copyReceiptToDocuments(receiptLocalUri, productId);
+    } catch {
+      receiptImageUrl = null;
+    }
+  } else if (existingReceiptUrl === null && originalReceiptUrl) {
+    await deleteLocalReceipt(originalReceiptUrl);
+    receiptImageUrl = null;
+  }
 
   await updateDoc(doc(db, "users", uid, "products", productId), {
     ...input,

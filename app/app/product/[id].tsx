@@ -6,6 +6,7 @@ import {
   Alert,
   Image,
   Linking,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -22,6 +23,7 @@ import { useI18n } from "../../src/hooks/useI18n";
 import { useThemeColors } from "../../src/hooks/useThemeColors";
 import type { TranslationKey } from "../../src/i18n/he";
 import { deleteProduct } from "../../src/services/products";
+import { resolveReceiptUri } from "../../src/services/receiptStorage";
 import { useAuthStore } from "../../src/store/authStore";
 import { formatDateDisplay, formatWarrantyDuration, getDaysLeft } from "../../src/utils/warranty";
 
@@ -53,6 +55,7 @@ export default function ProductDetailScreen() {
   const uid = useAuthStore((state) => state.user?.uid ?? null);
   const [errorKey, setErrorKey] = useState<TranslationKey | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [receiptPreviewVisible, setReceiptPreviewVisible] = useState(false);
 
   const product = products.find((item) => item.id === id);
   const importerEntry = useMemo(() => {
@@ -82,7 +85,7 @@ export default function ProductDetailScreen() {
             try {
               setIsDeleting(true);
               setErrorKey(null);
-              await deleteProduct(uid, id);
+              await deleteProduct(uid, id, product?.receiptImageUrl);
               router.back();
             } catch {
               setErrorKey("error.product.deleteFailed");
@@ -133,6 +136,7 @@ export default function ProductDetailScreen() {
       ? t(CATEGORY_LABEL_KEYS[product.category as keyof typeof CATEGORY_LABEL_KEYS])
       : "";
   const categoryIcon = getCategoryIcon(product.category);
+  const resolvedReceiptUri = resolveReceiptUri(product.receiptImageUrl);
 
   return (
     <>
@@ -213,7 +217,15 @@ export default function ProductDetailScreen() {
             <View style={styles.sectionCard}>
               <DetailRow icon="business-outline" isRTL={isRTL} label={t("product.importer")} value={product.importer} />
               {product.importerPhone ? (
-                <DetailRow icon="call-outline" isRTL={isRTL} label={t("product.importerPhone")} value={product.importerPhone} />
+                <DetailRow
+                  icon="call-outline"
+                  isRTL={isRTL}
+                  label={t("product.importerPhone")}
+                  onPress={() => {
+                    void Linking.openURL(`tel:${product.importerPhone}`);
+                  }}
+                  value={product.importerPhone}
+                />
               ) : null}
             </View>
           </>
@@ -231,11 +243,13 @@ export default function ProductDetailScreen() {
           </>
         ) : null}
 
-        {product.receiptImageUrl ? (
+        {resolvedReceiptUri ? (
           <>
             <SectionLabel isRTL={isRTL} label={t("product.receipt")} />
             <View style={styles.sectionCard}>
-              <Image resizeMode="cover" source={{ uri: product.receiptImageUrl }} style={styles.receiptImage} />
+              <Pressable onPress={() => setReceiptPreviewVisible(true)}>
+                <Image resizeMode="cover" source={{ uri: resolvedReceiptUri }} style={styles.receiptImage} />
+              </Pressable>
             </View>
           </>
         ) : null}
@@ -250,6 +264,22 @@ export default function ProductDetailScreen() {
 
         {errorKey ? <Text style={[styles.errorText, { textAlign: isRTL ? "right" : "left" }]}>{t(errorKey)}</Text> : null}
       </ScrollView>
+
+      <Modal animationType="fade" transparent visible={receiptPreviewVisible}>
+        <View style={styles.receiptPreviewOverlay}>
+          <Pressable
+            onPress={() => {
+              setReceiptPreviewVisible(false);
+            }}
+            style={[styles.receiptPreviewClose, { alignSelf: isRTL ? "flex-start" : "flex-end" }]}
+          >
+            <Text style={styles.receiptPreviewCloseText}>{t("common.cancel")}</Text>
+          </Pressable>
+          {resolvedReceiptUri ? (
+            <Image resizeMode="contain" source={{ uri: resolvedReceiptUri }} style={styles.receiptPreviewFullscreenImage} />
+          ) : null}
+        </View>
+      </Modal>
     </>
   );
 }
@@ -267,20 +297,39 @@ function DetailRow({
   value,
   icon,
   isRTL,
+  onPress,
 }: {
   label: string;
   value: string;
   icon?: keyof typeof Ionicons.glyphMap;
   isRTL: boolean;
+  onPress?: () => void;
 }) {
   const colors = useThemeColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const Container = onPress ? Pressable : View;
+
   return (
-    <View style={[styles.detailRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+    <Container
+      {...(onPress
+        ? {
+            onPress,
+          }
+        : {})}
+      style={[styles.detailRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}
+    >
       {icon ? <Ionicons color={colors.textSubtle} name={icon} size={15} style={styles.detailIcon} /> : null}
       <Text style={[styles.detailLabel, { textAlign: isRTL ? "right" : "left" }]}>{label}</Text>
-      <Text style={[styles.detailValue, { textAlign: isRTL ? "left" : "right" }]}>{value}</Text>
-    </View>
+      <Text
+        style={[
+          styles.detailValue,
+          { textAlign: isRTL ? "left" : "right" },
+          onPress && styles.detailValueInteractive,
+        ]}
+      >
+        {value}
+      </Text>
+    </Container>
   );
 }
 
@@ -391,10 +440,37 @@ const makeStyles = (c: ColorPalette) =>
       color: c.text,
       fontSize: 14,
     },
+    detailValueInteractive: {
+      color: c.primary,
+      fontWeight: "600",
+    },
     receiptImage: {
       width: "100%",
       height: 200,
       borderRadius: 12,
+    },
+    receiptPreviewOverlay: {
+      flex: 1,
+      backgroundColor: "#000000",
+      padding: 20,
+      justifyContent: "center",
+    },
+    receiptPreviewClose: {
+      position: "absolute",
+      top: 56,
+      left: 20,
+      right: 20,
+      zIndex: 1,
+      paddingVertical: 8,
+    },
+    receiptPreviewCloseText: {
+      color: "#ffffff",
+      fontSize: 16,
+      fontWeight: "700",
+    },
+    receiptPreviewFullscreenImage: {
+      width: "100%",
+      height: "100%",
     },
     serviceCard: {
       backgroundColor: c.accentSoft,

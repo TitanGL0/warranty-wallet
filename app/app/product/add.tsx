@@ -29,6 +29,7 @@ import { useI18n } from "../../src/hooks/useI18n";
 import { useThemeColors } from "../../src/hooks/useThemeColors";
 import type { TranslationKey } from "../../src/i18n/he";
 import { addProduct, updateProduct } from "../../src/services/products";
+import { resolveReceiptUri } from "../../src/services/receiptStorage";
 import { useAuthStore } from "../../src/store/authStore";
 import type { ProductInput } from "../../src/types";
 import { setCategoryPickerCallback } from "../../src/utils/categoryPickerCallback";
@@ -113,7 +114,7 @@ export default function AddProductScreen() {
   const [category, setCategory] = useState<CategoryOption>("other");
   const [purchaseDate, setPurchaseDate] = useState("");
   const [warrantyMonths, setWarrantyMonths] = useState(12);
-  const [warrantyInput, setWarrantyInput] = useState("12");
+  const [warrantyMonthsText, setWarrantyMonthsText] = useState("12");
   const [importer, setImporter] = useState("");
   const [importerPhone, setImporterPhone] = useState("");
   const [serial, setSerial] = useState("");
@@ -123,6 +124,7 @@ export default function AddProductScreen() {
   const [currency, setCurrency] = useState<(typeof CURRENCY_OPTIONS)[number]>("ILS");
   const [receiptLocalUri, setReceiptLocalUri] = useState<string | null>(null);
   const [existingReceiptUrl, setExistingReceiptUrl] = useState<string | null>(null);
+  const [originalReceiptUrl, setOriginalReceiptUrl] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorKey, setErrorKey] = useState<TranslationKey | null>(null);
   const [statusKey, setStatusKey] = useState<TranslationKey | null>(null);
@@ -154,7 +156,7 @@ export default function AddProductScreen() {
     );
     setPurchaseDate(existingProduct.purchaseDate);
     setWarrantyMonths(existingProduct.warrantyMonths);
-    setWarrantyInput(String(existingProduct.warrantyMonths));
+    setWarrantyMonthsText(String(existingProduct.warrantyMonths));
     setImporter(existingProduct.importer);
     setImporterPhone(existingProduct.importerPhone);
     setSerial(existingProduct.serial);
@@ -167,12 +169,9 @@ export default function AddProductScreen() {
         : "ILS",
     );
     setExistingReceiptUrl(existingProduct.receiptImageUrl ?? null);
+    setOriginalReceiptUrl(existingProduct.receiptImageUrl ?? null);
     setFormReady(true);
   }, [existingProduct, formReady, isEditMode]);
-
-  useEffect(() => {
-    setWarrantyInput(String(warrantyMonths));
-  }, [warrantyMonths]);
 
   useEffect(() => {
     if (isSubmitting || !pendingNavigation) {
@@ -202,7 +201,8 @@ export default function AddProductScreen() {
   const selectedDisplayDate = purchaseDate ? formatDateDisplay(purchaseDate, language) : t("calendar.selectDate");
   const selectedCategoryLabel = t(CATEGORY_LABEL_KEYS[category]);
   const selectedCategoryIcon = getCategoryIcon(category);
-  const activeReceiptUri = receiptLocalUri ?? existingReceiptUrl;
+  const resolvedExistingReceiptUri = resolveReceiptUri(existingReceiptUrl);
+  const activeReceiptUri = receiptLocalUri ?? resolvedExistingReceiptUri;
 
   const openCalendar = () => {
     const baseDate = purchaseDate && isValidDate(purchaseDate) ? parseIsoDate(purchaseDate) : new Date();
@@ -232,28 +232,25 @@ export default function AddProductScreen() {
 
   const clampWarrantyMonths = (value: number) => Math.min(MAX_MONTHS, Math.max(MIN_MONTHS, value));
 
-  const handleWarrantyInputChange = (value: string) => {
-    const numericValue = value.replace(/\D/g, "").slice(0, 3);
-    setWarrantyInput(numericValue);
-
-    if (!numericValue) {
-      return;
-    }
-
-    setWarrantyMonths(clampWarrantyMonths(Number.parseInt(numericValue, 10)));
+  const applyWarrantyMonths = (nextValue: number) => {
+    const clampedValue = clampWarrantyMonths(nextValue);
+    setWarrantyMonths(clampedValue);
+    setWarrantyMonthsText(String(clampedValue));
   };
 
-  const handleWarrantyInputBlur = () => {
-    if (!warrantyInput.trim()) {
-      setWarrantyMonths(MIN_MONTHS);
-      setWarrantyInput(String(MIN_MONTHS));
+  const handleWarrantyInputChange = (value: string) => {
+    const numericValue = value.replace(/\D/g, "").slice(0, 3);
+    setWarrantyMonthsText(numericValue);
+  };
+
+  const commitWarrantyInput = () => {
+    if (!warrantyMonthsText.trim()) {
+      applyWarrantyMonths(MIN_MONTHS);
       return;
     }
 
-    const parsed = Number.parseInt(warrantyInput, 10);
-    const nextValue = Number.isNaN(parsed) ? MIN_MONTHS : clampWarrantyMonths(parsed);
-    setWarrantyMonths(nextValue);
-    setWarrantyInput(String(nextValue));
+    const parsed = Number.parseInt(warrantyMonthsText, 10);
+    applyWarrantyMonths(Number.isNaN(parsed) ? MIN_MONTHS : parsed);
   };
 
   const handleDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
@@ -365,7 +362,7 @@ export default function AddProductScreen() {
     try {
       if (isEditMode && productId) {
         await withTimeout(
-          updateProduct(uid, productId, input, receiptLocalUri ?? null, existingReceiptUrl ?? null),
+          updateProduct(uid, productId, input, receiptLocalUri ?? null, existingReceiptUrl ?? null, originalReceiptUrl ?? null),
           15000,
           "updateProduct",
         );
@@ -485,7 +482,7 @@ export default function AddProductScreen() {
               <View style={[styles.stepper, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
                 <Pressable
                   disabled={isSubmitting || warrantyMonths <= MIN_MONTHS}
-                  onPress={() => setWarrantyMonths((current) => Math.max(MIN_MONTHS, current - 1))}
+                  onPress={() => applyWarrantyMonths(warrantyMonths - 1)}
                   style={[styles.stepperBtn, warrantyMonths <= MIN_MONTHS && styles.stepperBtnDisabled]}
                 >
                   <Text style={styles.stepperBtnText}>-</Text>
@@ -497,13 +494,14 @@ export default function AddProductScreen() {
                   selectTextOnFocus
                   style={[styles.stepperValueInput, isSubmitting && styles.inputDisabled]}
                   textAlign="center"
-                  value={warrantyInput}
-                  onBlur={handleWarrantyInputBlur}
+                  value={warrantyMonthsText}
+                  onBlur={commitWarrantyInput}
                   onChangeText={handleWarrantyInputChange}
+                  onSubmitEditing={commitWarrantyInput}
                 />
                 <Pressable
                   disabled={isSubmitting || warrantyMonths >= MAX_MONTHS}
-                  onPress={() => setWarrantyMonths((current) => Math.min(MAX_MONTHS, current + 1))}
+                  onPress={() => applyWarrantyMonths(warrantyMonths + 1)}
                   style={[styles.stepperBtn, warrantyMonths >= MAX_MONTHS && styles.stepperBtnDisabled]}
                 >
                   <Text style={styles.stepperBtnText}>+</Text>
@@ -622,10 +620,10 @@ export default function AddProductScreen() {
                     <Text style={styles.removeReceiptText}>{t("product.receiptRemove")}</Text>
                   </Pressable>
                 </View>
-              ) : existingReceiptUrl ? (
+              ) : resolvedExistingReceiptUri ? (
                 <View style={styles.receiptPreview}>
                   <Pressable onPress={() => setReceiptPreviewVisible(true)}>
-                    <Image resizeMode="cover" source={{ uri: existingReceiptUrl }} style={styles.receiptImage} />
+                    <Image resizeMode="cover" source={{ uri: resolvedExistingReceiptUri }} style={styles.receiptImage} />
                   </Pressable>
                   <Pressable
                     onPress={() => {
