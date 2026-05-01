@@ -10,6 +10,11 @@ export type ProductInput = {
   serial: string;
   imei: string;
   purchaseDate: string;
+  requiresInstallation: boolean;
+  installationDate: string | null;
+  installerName: string | null;
+  installationNotes: string | null;
+  installationImageUrl: string | null;
   warrantyMonths: number;
   importer: string;
   importerPhone: string;
@@ -29,6 +34,12 @@ export interface Product {
   serial: string;
   imei: string;
   purchaseDate: string;
+  requiresInstallation: boolean;
+  installationDate: string | null;
+  installerName: string | null;
+  installationNotes: string | null;
+  installationImageUrl: string | null;
+  warrantyStartDate: string;
   warrantyYears?: number;
   warrantyMonths: number;
   importer: string;

@@ -6,6 +6,17 @@ function parseIsoDate(dateStr: string) {
   return new Date(year, (month ?? 1) - 1, day ?? 1);
 }
 
+export function computeWarrantyStartDate(
+  purchaseDate: string,
+  requiresInstallation: boolean,
+  installationDate: string | null,
+): string {
+  if (!requiresInstallation || !installationDate) {
+    return purchaseDate;
+  }
+  return installationDate > purchaseDate ? installationDate : purchaseDate;
+}
+
 function getDaysInMonth(year: number, monthIndex: number) {
   return new Date(year, monthIndex + 1, 0).getDate();
 }

@@ -1,10 +1,18 @@
+import {
+  Heebo_400Regular,
+  Heebo_500Medium,
+  Heebo_600SemiBold,
+  Heebo_700Bold,
+  useFonts,
+} from "@expo-google-fonts/heebo";
 import { Redirect, Stack, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as Updates from "expo-updates";
 import { useEffect, useMemo, useRef } from "react";
-import { ActivityIndicator, I18nManager, Platform, StyleSheet, Text, View, useColorScheme } from "react-native";
+import { ActivityIndicator, I18nManager, Platform, StyleSheet, Text, TextInput, View, useColorScheme } from "react-native";
 
 import { type ColorPalette } from "../src/constants/colors";
+import { fontFamilies, fontSizes, lineHeights } from "../src/constants/typography";
 import { useI18n } from "../src/hooks/useI18n";
 import { useThemeColors } from "../src/hooks/useThemeColors";
 import { onAuthStateChanged } from "../src/services/auth";
@@ -15,6 +23,12 @@ import { useSettingsStore } from "../src/store/settingsStore";
 export default function RootLayout() {
   const colors = useThemeColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const [fontsLoaded] = useFonts({
+    Heebo_400Regular,
+    Heebo_500Medium,
+    Heebo_600SemiBold,
+    Heebo_700Bold,
+  });
   const hasHydrated = useSettingsStore((state) => state.hasHydrated === true);
   const theme = useSettingsStore((state) => state.theme);
   const syncFromProfile = useSettingsStore((state) => state.syncFromProfile);
@@ -25,9 +39,41 @@ export default function RootLayout() {
   const setLoading = useAuthStore((state) => state.setLoading);
   const { language, t } = useI18n();
   const reloadingRef = useRef(false);
+  const typographyAppliedRef = useRef(false);
   const segments = useSegments();
   const systemScheme = useColorScheme();
   const isDark = theme === "dark" || (theme === "system" && systemScheme === "dark");
+
+  useEffect(() => {
+    if (!fontsLoaded || typographyAppliedRef.current) {
+      return;
+    }
+
+    const TextComponent = Text as typeof Text & {
+      defaultProps?: {
+        style?: unknown;
+      };
+    };
+    const TextInputComponent = TextInput as typeof TextInput & {
+      defaultProps?: {
+        style?: unknown;
+      };
+    };
+
+    TextComponent.defaultProps = TextComponent.defaultProps ?? {};
+    TextComponent.defaultProps.style = [
+      { fontFamily: fontFamilies.regular },
+      TextComponent.defaultProps.style,
+    ];
+
+    TextInputComponent.defaultProps = TextInputComponent.defaultProps ?? {};
+    TextInputComponent.defaultProps.style = [
+      { fontFamily: fontFamilies.regular },
+      TextInputComponent.defaultProps.style,
+    ];
+
+    typographyAppliedRef.current = true;
+  }, [fontsLoaded]);
 
   useEffect(() => {
     if (!hasHydrated || Platform.OS === "web") {
@@ -101,7 +147,7 @@ export default function RootLayout() {
     };
   }, [language, setLoading, setProfile, setUser, syncFromProfile]);
 
-  if (isLoading || !hasHydrated) {
+  if (isLoading || !hasHydrated || !fontsLoaded) {
     return (
       <View style={styles.loadingScreen}>
         <StatusBar style={isDark ? "light" : "dark"} />
@@ -125,7 +171,7 @@ export default function RootLayout() {
     headerShown: false,
     headerStyle: { backgroundColor: colors.surface },
     headerTintColor: colors.text,
-    headerTitleStyle: { fontSize: 18, fontWeight: "600" as const },
+    headerTitleStyle: { fontSize: fontSizes.lg, fontFamily: fontFamilies.semibold },
     headerShadowVisible: false,
     headerBackTitleVisible: false,
     headerBackTitle: "",
@@ -138,10 +184,10 @@ export default function RootLayout() {
       <Stack initialRouteName="(tabs)" screenOptions={stackScreenOptions}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="(auth)" />
-        <Stack.Screen name="product/add" options={{ title: t("addProduct.title"), headerShown: true }} />
-        <Stack.Screen name="product/category-picker" options={{ title: t("addProduct.categoryPickerTitle"), headerShown: true }} />
-        <Stack.Screen name="product/[id]" options={{ title: t("productDetail.title"), headerShown: true }} />
-        <Stack.Screen name="products" options={{ title: t("home.title"), headerShown: true }} />
+        <Stack.Screen name="product/add" options={{ title: t("addProduct.title"), headerShown: false }} />
+        <Stack.Screen name="product/category-picker" options={{ title: t("addProduct.categoryPickerTitle"), headerShown: false }} />
+        <Stack.Screen name="product/[id]" options={{ title: t("productDetail.title"), headerShown: false }} />
+        <Stack.Screen name="products" options={{ title: t("home.title"), headerShown: false }} />
       </Stack>
     </View>
   );
@@ -162,6 +208,8 @@ const makeStyles = (c: ColorPalette) =>
     },
     loadingText: {
       color: c.textMuted,
-      fontSize: 14,
+      fontSize: fontSizes.sm,
+      lineHeight: lineHeights.sm,
+      fontFamily: fontFamilies.regular,
     },
   });

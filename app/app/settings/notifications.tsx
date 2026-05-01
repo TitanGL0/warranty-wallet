@@ -1,9 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Stack } from "expo-router";
+import { Stack, router } from "expo-router";
 import { Children, type ReactNode, useMemo } from "react";
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { type ColorPalette } from "../../src/constants/colors";
+import { fontFamilies, fontSizes, lineHeights } from "../../src/constants/typography";
 import { useI18n } from "../../src/hooks/useI18n";
 import { useThemeColors } from "../../src/hooks/useThemeColors";
 import { useSettingsStore } from "../../src/store/settingsStore";
@@ -41,13 +43,30 @@ export default function NotificationSettingsScreen() {
   const setNotifyProductAdded = useSettingsStore((state) => state.setNotifyProductAdded);
   const setNotifyMonthlySummary = useSettingsStore((state) => state.setNotifyMonthlySummary);
   const setExpiryAlertDays = useSettingsStore((state) => state.setExpiryAlertDays);
+  const insets = useSafeAreaInsets();
 
   const notificationsDisabled = !notificationsEnabled;
 
   return (
     <>
-      <Stack.Screen options={{ headerShown: true, title: t("settings.notifications.title") }} />
-      <ScrollView contentContainerStyle={styles.content} style={styles.screen} showsVerticalScrollIndicator={false}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}
+        style={styles.screen}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={[styles.headerRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+          <Pressable
+            onPress={() => {
+              router.back();
+            }}
+            style={styles.headerButton}
+          >
+            <Ionicons color={colors.text} name={isRTL ? "chevron-forward" : "chevron-back"} size={22} />
+          </Pressable>
+          <Text style={styles.headerTitle}>{t("settings.notifications.title")}</Text>
+          <View style={styles.headerSpacer} />
+        </View>
         <View style={[styles.banner, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
           <Ionicons color={colors.primary} name="notifications-outline" size={20} />
           <Text style={[styles.bannerText, { textAlign: isRTL ? "right" : "left" }]}>{t("settings.notifications.pushNotice")}</Text>
@@ -227,6 +246,29 @@ const makeStyles = (c: ColorPalette) =>
       padding: 16,
       gap: 16,
       paddingBottom: 32,
+    },
+    headerRow: {
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+    },
+    headerButton: {
+      width: 40,
+      height: 40,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    headerSpacer: {
+      width: 40,
+      height: 40,
+    },
+    headerTitle: {
+      flex: 1,
+      color: c.text,
+      fontSize: fontSizes.xl,
+      lineHeight: lineHeights.xl,
+      fontFamily: fontFamilies.bold,
+      textAlign: "center",
     },
     banner: {
       backgroundColor: c.surface,

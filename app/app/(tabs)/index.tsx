@@ -1,12 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useMemo } from "react";
-import { router } from "expo-router";
+import { router, Tabs } from "expo-router";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { DashboardProductCard } from "../../src/components/DashboardProductCard";
-import { SectionHeader } from "../../src/components/SectionHeader";
-import { StatCard } from "../../src/components/StatCard";
 import { type ColorPalette } from "../../src/constants/colors";
+import { fontFamilies, fontSizes, lineHeights, radii } from "../../src/constants/typography";
 import { useProducts } from "../../src/hooks/useProducts";
 import { useI18n } from "../../src/hooks/useI18n";
 import { useThemeColors } from "../../src/hooks/useThemeColors";
@@ -17,6 +17,7 @@ export default function HomeScreen() {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { products, isLoading } = useProducts();
   const { t, isRTL, language } = useI18n();
+  const insets = useSafeAreaInsets();
   const profile = useAuthStore((state) => state.profile);
   const user = useAuthStore((state) => state.user);
   const firstName = (profile?.displayName || user?.displayName || "").split(" ")[0];
@@ -28,14 +29,20 @@ export default function HomeScreen() {
 
   if (isLoading) {
     return (
-      <View style={styles.loadingScreen}>
+      <View style={[styles.loadingScreen, { paddingTop: insets.top }]}>
+        <Tabs.Screen options={{ headerShown: false }} />
         <ActivityIndicator color={colors.accent} size="large" />
       </View>
     );
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.content} style={styles.screen} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}
+      showsVerticalScrollIndicator={false}
+      style={styles.screen}
+    >
+      <Tabs.Screen options={{ headerShown: false }} />
       <View style={[styles.greetingRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
         <View style={styles.greetingTextBlock}>
           <Text style={[styles.greeting, { textAlign: isRTL ? "right" : "left" }]}>{greetingText}</Text>
@@ -66,22 +73,29 @@ export default function HomeScreen() {
 
       {hasProducts ? (
         <View style={[styles.statsRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
-          <StatCard icon="checkmark-circle" iconColor={colors.accent} label={t("home.stats.total")} value={products.length} />
-          <StatCard icon="alert-circle" iconColor={colors.warning} label={t("home.stats.expiringSoon")} value={expiringSoon.length} />
-          <StatCard icon="close-circle" iconColor={colors.danger} label={t("home.stats.expired")} value={expired.length} />
+          <DashboardStatCard icon="checkmark-circle" iconColor={colors.accent} label={t("home.stats.total")} value={products.length} />
+          <DashboardStatCard icon="alert-circle" iconColor={colors.warning} label={t("home.stats.expiringSoon")} value={expiringSoon.length} />
+          <DashboardStatCard icon="close-circle" iconColor={colors.danger} label={t("home.stats.expired")} value={expired.length} />
         </View>
       ) : null}
 
       {!isLoading && hasProducts ? (
         <View style={styles.section}>
-          <SectionHeader
-            actionLabel={t("home.viewAll")}
-            isRTL={isRTL}
-            onActionPress={() => {
-              router.push("/products");
-            }}
-            title={t("home.recentlyAdded")}
-          />
+          <View style={[styles.sectionHeaderRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+            <Text style={[styles.sectionHeaderTitle, { textAlign: isRTL ? "right" : "left" }]}>
+              {t("home.recentlyAdded")}
+            </Text>
+            <Pressable
+              onPress={() => {
+                router.push("/products");
+              }}
+              style={styles.sectionHeaderActionWrap}
+            >
+              <Text style={[styles.sectionHeaderAction, { textAlign: isRTL ? "left" : "right" }]}>
+                {t("home.viewAll")}
+              </Text>
+            </Pressable>
+          </View>
           <View style={styles.cardList}>
             {recentProducts.map((product) => (
               <DashboardProductCard
@@ -115,7 +129,11 @@ export default function HomeScreen() {
         </View>
       ) : (
         <View style={styles.section}>
-          <SectionHeader isRTL={isRTL} title={t("home.expiringSoon")} />
+          <View style={[styles.sectionHeaderRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+            <Text style={[styles.sectionHeaderTitle, { textAlign: isRTL ? "right" : "left" }]}>
+              {t("home.expiringSoon")}
+            </Text>
+          </View>
 
           {expiringSoon.length > 0 ? (
             <View style={styles.cardList}>
@@ -145,6 +163,32 @@ export default function HomeScreen() {
   );
 }
 
+function DashboardStatCard({
+  value,
+  label,
+  icon,
+  iconColor,
+}: {
+  value: number;
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  iconColor: string;
+}) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const iconBorderColor = `${iconColor}26`;
+
+  return (
+    <View style={styles.statCard}>
+      <View style={[styles.statIconWrap, { backgroundColor: colors.background, borderColor: iconBorderColor }]}>
+        <Ionicons color={iconColor} name={icon} size={22} />
+      </View>
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
+}
+
 const makeStyles = (c: ColorPalette) =>
   StyleSheet.create({
     screen: {
@@ -152,9 +196,9 @@ const makeStyles = (c: ColorPalette) =>
       backgroundColor: c.background,
     },
     content: {
-      padding: 16,
-      gap: 20,
-      paddingBottom: 40,
+      paddingHorizontal: 16,
+      paddingBottom: 24,
+      gap: 16,
     },
     loadingScreen: {
       flex: 1,
@@ -169,25 +213,29 @@ const makeStyles = (c: ColorPalette) =>
     },
     greetingTextBlock: {
       flex: 1,
-      gap: 4,
+      gap: 0,
     },
     greeting: {
       color: c.text,
-      fontSize: 26,
-      fontWeight: "800",
+      fontSize: fontSizes.xxl,
+      lineHeight: lineHeights.xxl,
+      fontFamily: fontFamilies.bold,
     },
     greetingSubtitle: {
+      marginTop: 4,
       color: c.textMuted,
-      fontSize: 14,
+      fontSize: fontSizes.sm,
+      lineHeight: lineHeights.sm,
+      fontFamily: fontFamilies.regular,
     },
     greetingActions: {
       alignItems: "center",
-      gap: 10,
+      gap: 12,
     },
     iconButton: {
       width: 44,
       height: 44,
-      borderRadius: 14,
+      borderRadius: radii.lg,
       backgroundColor: c.surface,
       borderWidth: 1,
       borderColor: c.border,
@@ -205,23 +253,82 @@ const makeStyles = (c: ColorPalette) =>
     },
     addButton: {
       backgroundColor: c.primary,
-      borderRadius: 12,
-      paddingHorizontal: 14,
-      paddingVertical: 10,
+      borderRadius: radii.lg,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
       alignItems: "center",
       justifyContent: "center",
     },
     addButtonText: {
       color: c.surface,
-      fontSize: 13,
-      fontWeight: "700",
+      fontSize: fontSizes.md,
+      lineHeight: lineHeights.md,
+      fontFamily: fontFamilies.semibold,
     },
     statsRow: {
       flexDirection: "row",
-      gap: 10,
+      gap: 12,
+    },
+    statCard: {
+      flex: 1,
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.border,
+      borderRadius: radii.xl,
+      padding: 12,
+      alignItems: "center",
+      gap: 4,
+    },
+    statIconWrap: {
+      width: 40,
+      height: 40,
+      borderRadius: radii.lg,
+      borderWidth: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      shadowColor: "#000000",
+      shadowOpacity: 0.08,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 2 },
+    },
+    statValue: {
+      fontSize: fontSizes.xxl,
+      lineHeight: lineHeights.xxl,
+      fontFamily: fontFamilies.bold,
+      color: c.text,
+    },
+    statLabel: {
+      fontSize: fontSizes.xs,
+      lineHeight: lineHeights.xs,
+      fontFamily: fontFamilies.semibold,
+      textTransform: "uppercase",
+      letterSpacing: 0.5,
+      textAlign: "center",
+      color: c.textMuted,
+    },
+    sectionHeaderRow: {
+      alignItems: "baseline",
+      justifyContent: "space-between",
+      gap: 12,
+    },
+    sectionHeaderTitle: {
+      flex: 1,
+      color: c.text,
+      fontSize: fontSizes.lg,
+      lineHeight: lineHeights.lg,
+      fontFamily: fontFamilies.semibold,
+    },
+    sectionHeaderActionWrap: {
+      paddingVertical: 4,
+    },
+    sectionHeaderAction: {
+      color: c.primary,
+      fontSize: fontSizes.sm,
+      lineHeight: lineHeights.sm,
+      fontFamily: fontFamilies.semibold,
     },
     section: {
-      gap: 12,
+      gap: 8,
     },
     cardList: {
       gap: 12,
@@ -231,7 +338,7 @@ const makeStyles = (c: ColorPalette) =>
       alignItems: "center",
       justifyContent: "center",
       gap: 16,
-      paddingHorizontal: 20,
+      paddingHorizontal: 24,
     },
     emptyStateIcon: {
       width: 88,
@@ -243,44 +350,47 @@ const makeStyles = (c: ColorPalette) =>
     },
     emptyStateTitle: {
       color: c.text,
-      fontSize: 24,
-      fontWeight: "800",
+      fontSize: fontSizes.xxl,
+      lineHeight: lineHeights.xxl,
+      fontFamily: fontFamilies.bold,
       textAlign: "center",
     },
     emptyStateDescription: {
       color: c.textMuted,
-      fontSize: 15,
-      lineHeight: 24,
+      fontSize: fontSizes.sm,
+      lineHeight: lineHeights.sm,
+      fontFamily: fontFamilies.regular,
       textAlign: "center",
       maxWidth: 320,
     },
     emptyStateButton: {
       minHeight: 48,
-      borderRadius: 16,
+      borderRadius: radii.lg,
       backgroundColor: c.primary,
       paddingHorizontal: 20,
       alignItems: "center",
       justifyContent: "center",
-      marginTop: 4,
+      marginTop: 8,
     },
     emptyStateButtonText: {
       color: c.surface,
-      fontSize: 15,
-      fontWeight: "700",
+      fontSize: fontSizes.md,
+      lineHeight: lineHeights.md,
+      fontFamily: fontFamilies.semibold,
     },
     goodCard: {
       backgroundColor: c.surface,
-      borderRadius: 24,
+      borderRadius: radii.xl,
       borderWidth: 1,
       borderColor: c.border,
-      padding: 20,
+      padding: 16,
       gap: 12,
       alignItems: "center",
     },
     goodIcon: {
       width: 64,
       height: 64,
-      borderRadius: 22,
+      borderRadius: radii.lg,
       backgroundColor: c.accentSoft,
       alignItems: "center",
       justifyContent: "center",
@@ -288,13 +398,15 @@ const makeStyles = (c: ColorPalette) =>
     goodTitle: {
       alignSelf: "stretch",
       color: c.text,
-      fontSize: 18,
-      fontWeight: "700",
+      fontSize: fontSizes.lg,
+      lineHeight: lineHeights.lg,
+      fontFamily: fontFamilies.semibold,
     },
     goodDescription: {
       alignSelf: "stretch",
       color: c.textMuted,
-      fontSize: 14,
-      lineHeight: 22,
+      fontSize: fontSizes.sm,
+      lineHeight: lineHeights.sm,
+      fontFamily: fontFamilies.regular,
     },
   });

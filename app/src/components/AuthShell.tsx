@@ -3,6 +3,7 @@ import { type ReactNode, useMemo } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { type ColorPalette } from "../constants/colors";
+import { fontFamilies, fontSizes, lineHeights } from "../constants/typography";
 import { useI18n } from "../hooks/useI18n";
 import { useThemeColors } from "../hooks/useThemeColors";
 
@@ -62,14 +63,16 @@ const makeStyles = (c: ColorPalette) =>
     },
     brandName: {
       color: c.text,
-      fontSize: 28,
-      fontWeight: "800",
+      fontSize: fontSizes.xxl,
+      lineHeight: lineHeights.xxl,
+      fontFamily: fontFamilies.bold,
       textAlign: "center",
     },
     brandTagline: {
       color: c.textMuted,
-      fontSize: 15,
-      lineHeight: 22,
+      fontSize: fontSizes.sm,
+      lineHeight: lineHeights.sm,
+      fontFamily: fontFamilies.regular,
       textAlign: "center",
     },
   });

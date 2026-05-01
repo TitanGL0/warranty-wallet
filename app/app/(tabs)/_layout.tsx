@@ -1,12 +1,15 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { fontFamilies, fontSizes, lineHeights } from "../../src/constants/typography";
 import { useI18n } from "../../src/hooks/useI18n";
 import { useThemeColors } from "../../src/hooks/useThemeColors";
 
 export default function TabsLayout() {
   const { t, isRTL } = useI18n();
   const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
 
   const homeScreen = (
     <Tabs.Screen
@@ -50,22 +53,34 @@ export default function TabsLayout() {
       screenOptions={{
         headerStyle: { backgroundColor: colors.surface },
         headerTintColor: colors.text,
-        headerTitleStyle: { fontSize: 18 },
+        headerTitleStyle: {
+          fontSize: fontSizes.lg,
+          lineHeight: lineHeights.lg,
+          fontFamily: fontFamilies.semibold,
+        },
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textSubtle,
         tabBarStyle: {
+          height: 58 + insets.bottom,
+          paddingTop: 6,
+          paddingBottom: Math.max(insets.bottom, 8),
           backgroundColor: colors.surface,
-          borderTopColor: colors.border,
           borderTopWidth: 1,
+          borderTopColor: colors.border,
           elevation: 0,
           shadowOpacity: 0,
-          height: 64,
-          paddingBottom: 8,
-          paddingTop: 8,
         },
         tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: "600",
+          fontSize: fontSizes.xs,
+          lineHeight: 14,
+          fontFamily: fontFamilies.semibold,
+          marginTop: 2,
+        },
+        tabBarIconStyle: {
+          marginTop: 4,
+        },
+        tabBarItemStyle: {
+          paddingVertical: 0,
         },
       }}
     >

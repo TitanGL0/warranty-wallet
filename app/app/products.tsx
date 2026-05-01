@@ -12,9 +12,11 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ProductCard } from "../src/components/ProductCard";
 import { type ColorPalette } from "../src/constants/colors";
+import { fontFamilies, fontSizes, lineHeights } from "../src/constants/typography";
 import { useProducts } from "../src/hooks/useProducts";
 import { useI18n } from "../src/hooks/useI18n";
 import { useThemeColors } from "../src/hooks/useThemeColors";
@@ -73,6 +75,7 @@ export default function ProductsScreen() {
   const [tempCompleteness, setTempCompleteness] = useState<CompletenessFilter>("all");
   const [sortModalVisible, setSortModalVisible] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const insets = useSafeAreaInsets();
 
   const availableCategories = useMemo(() => {
     const cats = new Set<string>();
@@ -240,8 +243,20 @@ export default function ProductsScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: t("home.title") }} />
-      <View style={styles.screen}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <View style={[styles.screen, { paddingTop: insets.top + 16 }]}>
+        <View style={[styles.headerRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+          <Pressable
+            onPress={() => {
+              router.back();
+            }}
+            style={styles.headerIconButton}
+          >
+            <Ionicons color={colors.text} name={isRTL ? "chevron-forward" : "chevron-back"} size={22} />
+          </Pressable>
+          <Text style={[styles.headerTitle, { textAlign: "center" }]}>{t("home.title")}</Text>
+          <View style={styles.headerSideSpacer} />
+        </View>
         <View style={[styles.searchShell, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
           <Ionicons color={colors.textSubtle} name="search-outline" size={18} />
           <TextInput
@@ -489,9 +504,30 @@ const makeStyles = (c: ColorPalette) =>
       flex: 1,
       backgroundColor: c.background,
       paddingHorizontal: 16,
-      paddingTop: 16,
       paddingBottom: 16,
       gap: 14,
+    },
+    headerRow: {
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+    },
+    headerIconButton: {
+      width: 40,
+      height: 40,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    headerSideSpacer: {
+      width: 40,
+      height: 40,
+    },
+    headerTitle: {
+      flex: 1,
+      color: c.text,
+      fontSize: fontSizes.xl,
+      lineHeight: lineHeights.xl,
+      fontFamily: fontFamilies.bold,
     },
     searchShell: {
       minHeight: 48,

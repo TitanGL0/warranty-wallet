@@ -1,9 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Stack, router } from "expo-router";
+import { Tabs, router } from "expo-router";
 import { Children, type ReactNode, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { type ColorPalette } from "../../src/constants/colors";
+import { fontFamilies, fontSizes, lineHeights } from "../../src/constants/typography";
 import { useI18n } from "../../src/hooks/useI18n";
 import { useProducts } from "../../src/hooks/useProducts";
 import { useThemeColors } from "../../src/hooks/useThemeColors";
@@ -30,6 +32,7 @@ export default function SettingsScreen() {
   const signOut = useAuthStore((state) => state.signOut);
   const { products, isLoading: productsLoading } = useProducts();
   const [isExporting, setIsExporting] = useState(false);
+  const insets = useSafeAreaInsets();
   const languageOptions: Language[] = ["he", "en"];
   const displayName = profile?.displayName || user?.displayName || "";
 
@@ -56,8 +59,13 @@ export default function SettingsScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: t("settings.title") }} />
-      <ScrollView contentContainerStyle={styles.content} style={styles.screen} showsVerticalScrollIndicator={false}>
+      <Tabs.Screen options={{ headerShown: false }} />
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}
+        style={styles.screen}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={[styles.screenTitle, { textAlign: isRTL ? "right" : "left" }]}>{t("settings.title")}</Text>
         <View style={[styles.profileCard, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
           <View style={styles.avatar}>
             {firstCharacter ? (
@@ -256,6 +264,12 @@ const makeStyles = (c: ColorPalette) =>
       gap: 16,
       paddingBottom: 32,
     },
+    screenTitle: {
+      color: c.text,
+      fontSize: fontSizes.xxl,
+      lineHeight: lineHeights.xxl,
+      fontFamily: fontFamilies.bold,
+    },
     profileCard: {
       backgroundColor: c.surface,
       borderRadius: 24,
@@ -275,8 +289,9 @@ const makeStyles = (c: ColorPalette) =>
     },
     avatarText: {
       color: c.primary,
-      fontSize: 20,
-      fontWeight: "700",
+      fontSize: fontSizes.xl,
+      lineHeight: lineHeights.xl,
+      fontFamily: fontFamilies.bold,
     },
     profileText: {
       flex: 1,
@@ -284,12 +299,15 @@ const makeStyles = (c: ColorPalette) =>
     },
     profileName: {
       color: c.text,
-      fontSize: 16,
-      fontWeight: "700",
+      fontSize: fontSizes.md,
+      lineHeight: lineHeights.md,
+      fontFamily: fontFamilies.bold,
     },
     profileEmail: {
       color: c.textMuted,
-      fontSize: 13,
+      fontSize: fontSizes.sm,
+      lineHeight: lineHeights.sm,
+      fontFamily: fontFamilies.regular,
     },
     proCard: {
       backgroundColor: c.primarySoft,
@@ -305,13 +323,15 @@ const makeStyles = (c: ColorPalette) =>
     },
     proTitle: {
       color: c.primary,
-      fontSize: 17,
-      fontWeight: "800",
+      fontSize: fontSizes.lg,
+      lineHeight: lineHeights.lg,
+      fontFamily: fontFamilies.bold,
     },
     proDescription: {
       color: c.text,
-      fontSize: 14,
-      lineHeight: 22,
+      fontSize: fontSizes.sm,
+      lineHeight: lineHeights.sm,
+      fontFamily: fontFamilies.regular,
     },
     proButton: {
       minHeight: 46,
@@ -322,13 +342,15 @@ const makeStyles = (c: ColorPalette) =>
     },
     proButtonText: {
       color: c.surface,
-      fontSize: 15,
-      fontWeight: "700",
+      fontSize: fontSizes.md,
+      lineHeight: lineHeights.md,
+      fontFamily: fontFamilies.semibold,
     },
     sectionLabel: {
       color: c.textSubtle,
-      fontSize: 11,
-      fontWeight: "700",
+      fontSize: fontSizes.xs,
+      lineHeight: lineHeights.xs,
+      fontFamily: fontFamilies.semibold,
       letterSpacing: 0.8,
       textTransform: "uppercase",
     },
@@ -368,21 +390,24 @@ const makeStyles = (c: ColorPalette) =>
     },
     rowTitle: {
       color: c.text,
-      fontSize: 14,
-      fontWeight: "700",
+      fontSize: fontSizes.sm,
+      lineHeight: lineHeights.sm,
+      fontFamily: fontFamilies.semibold,
     },
     rowTitleDestructive: {
       color: c.danger,
     },
     rowSubtitle: {
       color: c.textSubtle,
-      fontSize: 12,
-      lineHeight: 18,
+      fontSize: fontSizes.xs,
+      lineHeight: lineHeights.xs,
+      fontFamily: fontFamilies.regular,
     },
     rowValue: {
       color: c.textMuted,
-      fontSize: 12,
-      fontWeight: "600",
+      fontSize: fontSizes.xs,
+      lineHeight: lineHeights.xs,
+      fontFamily: fontFamilies.semibold,
     },
     languageBlock: {
       paddingVertical: 14,
@@ -409,15 +434,17 @@ const makeStyles = (c: ColorPalette) =>
     },
     languageButtonText: {
       color: c.text,
-      fontSize: 14,
-      fontWeight: "700",
+      fontSize: fontSizes.sm,
+      lineHeight: lineHeights.sm,
+      fontFamily: fontFamilies.semibold,
     },
     languageButtonTextSelected: {
       color: c.surface,
     },
     caption: {
       color: c.textSubtle,
-      fontSize: 12,
-      lineHeight: 18,
+      fontSize: fontSizes.xs,
+      lineHeight: lineHeights.xs,
+      fontFamily: fontFamilies.regular,
     },
   });

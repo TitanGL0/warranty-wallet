@@ -13,10 +13,12 @@ import {
   Text,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { WarrantyBadge } from "../../src/components/WarrantyBadge";
 import { getCategoryIcon } from "../../src/constants/categoryIcons";
 import { type ColorPalette } from "../../src/constants/colors";
+import { fontFamilies, fontSizes, lineHeights } from "../../src/constants/typography";
 import { IMPORTERS } from "../../src/constants/importers";
 import { useProducts } from "../../src/hooks/useProducts";
 import { useI18n } from "../../src/hooks/useI18n";
@@ -56,6 +58,8 @@ export default function ProductDetailScreen() {
   const [errorKey, setErrorKey] = useState<TranslationKey | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [receiptPreviewVisible, setReceiptPreviewVisible] = useState(false);
+  const [receiptPreviewUri, setReceiptPreviewUri] = useState<string | null>(null);
+  const insets = useSafeAreaInsets();
 
   const product = products.find((item) => item.id === id);
   const importerEntry = useMemo(() => {
@@ -85,7 +89,7 @@ export default function ProductDetailScreen() {
             try {
               setIsDeleting(true);
               setErrorKey(null);
-              await deleteProduct(uid, id, product?.receiptImageUrl);
+              await deleteProduct(uid, id, product?.receiptImageUrl, product?.installationImageUrl);
               router.back();
             } catch {
               setErrorKey("error.product.deleteFailed");
@@ -105,17 +109,46 @@ export default function ProductDetailScreen() {
 
   if (isLoading) {
     return (
-      <View style={styles.centerState}>
-        <ActivityIndicator color={colors.accent} size="large" />
-      </View>
+      <>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={[styles.loadingScreen, { paddingTop: insets.top + 16 }]}>
+          <View style={[styles.screenHeaderRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+            <Pressable
+              onPress={() => {
+                router.back();
+              }}
+              style={styles.screenHeaderButton}
+            >
+              <Ionicons color={colors.text} name={isRTL ? "chevron-forward" : "chevron-back"} size={22} />
+            </Pressable>
+            <Text style={styles.screenHeaderTitle}>{t("productDetail.title")}</Text>
+            <View style={styles.screenHeaderSpacer} />
+          </View>
+          <View style={styles.centerState}>
+            <ActivityIndicator color={colors.accent} size="large" />
+          </View>
+        </View>
+      </>
     );
   }
 
   if (!product) {
     return (
       <>
-        <Stack.Screen options={{ title: t("productDetail.title") }} />
-        <View style={styles.notFoundScreen}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={[styles.notFoundScreen, { paddingTop: insets.top + 16 }]}>
+          <View style={[styles.screenHeaderRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+            <Pressable
+              onPress={() => {
+                router.back();
+              }}
+              style={styles.screenHeaderButton}
+            >
+              <Ionicons color={colors.text} name={isRTL ? "chevron-forward" : "chevron-back"} size={22} />
+            </Pressable>
+            <Text style={styles.screenHeaderTitle}>{t("productDetail.title")}</Text>
+            <View style={styles.screenHeaderSpacer} />
+          </View>
           <Text style={[styles.notFoundText, { textAlign: isRTL ? "right" : "left" }]}>{t("productDetail.notFound")}</Text>
           <Pressable
             onPress={() => {
@@ -137,11 +170,45 @@ export default function ProductDetailScreen() {
       : "";
   const categoryIcon = getCategoryIcon(product.category);
   const resolvedReceiptUri = resolveReceiptUri(product.receiptImageUrl);
+  const resolvedInstallUri = resolveReceiptUri(product.installationImageUrl);
+  const hasInstallationDetails = Boolean(product.installationDate || product.installerName || product.installationNotes);
+  const documentItems = [
+    resolvedReceiptUri
+      ? {
+          key: "receipt",
+          label: t("product.receipt"),
+          uri: resolvedReceiptUri,
+        }
+      : null,
+    resolvedInstallUri
+      ? {
+          key: "installation",
+          label: t("product.installationCertificate"),
+          uri: resolvedInstallUri,
+        }
+      : null,
+  ].filter(Boolean) as Array<{ key: string; label: string; uri: string }>;
 
   return (
     <>
-      <Stack.Screen options={{ title: t("productDetail.title") }} />
-      <ScrollView contentContainerStyle={styles.content} style={styles.screen} showsVerticalScrollIndicator={false}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}
+        style={styles.screen}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={[styles.screenHeaderRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+          <Pressable
+            onPress={() => {
+              router.back();
+            }}
+            style={styles.screenHeaderButton}
+          >
+            <Ionicons color={colors.text} name={isRTL ? "chevron-forward" : "chevron-back"} size={22} />
+          </Pressable>
+          <Text style={styles.screenHeaderTitle}>{t("productDetail.title")}</Text>
+          <View style={styles.screenHeaderSpacer} />
+        </View>
         <View style={styles.headerCard}>
           <View style={[styles.headerTop, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
             <View style={styles.headerIcon}>
@@ -173,8 +240,56 @@ export default function ProductDetailScreen() {
           <SectionLabel isRTL={isRTL} label={t("addProduct.sectionWarranty")} />
           <View style={styles.sectionCard}>
             <DetailRow icon="timer-outline" isRTL={isRTL} label={t("product.warrantyDuration")} value={formatWarrantyDuration(product.warrantyMonths, language)} />
+            {product.warrantyStartDate !== product.purchaseDate ? (
+              <DetailRow
+                icon="shield-checkmark-outline"
+                isRTL={isRTL}
+                label={t("productDetail.warrantyFrom")}
+                value={formatDateDisplay(product.warrantyStartDate, language)}
+              />
+            ) : null}
           </View>
         </>
+
+        {product.requiresInstallation && hasInstallationDetails ? (
+          <>
+            <SectionLabel isRTL={isRTL} label={t("productDetail.installationSection")} />
+            <View style={styles.sectionCard}>
+              {product.installationDate ? (
+                <DetailRow
+                  icon="calendar-outline"
+                  isRTL={isRTL}
+                  label={t("productDetail.installedOn")}
+                  value={formatDateDisplay(product.installationDate, language)}
+                />
+              ) : null}
+              {product.installerName ? (
+                <DetailRow
+                  icon="person-outline"
+                  isRTL={isRTL}
+                  label={t("product.installerName")}
+                  value={product.installerName}
+                />
+              ) : null}
+              {product.installationNotes ? (
+                <DetailRow
+                  icon="document-text-outline"
+                  isRTL={isRTL}
+                  label={t("product.installationNotes")}
+                  value={product.installationNotes}
+                />
+              ) : null}
+              {product.installationDate && product.installationDate > product.purchaseDate ? (
+                <View style={[styles.infoRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+                  <Ionicons color={colors.accent} name="information-circle-outline" size={14} />
+                  <Text style={[styles.infoRowText, { textAlign: isRTL ? "right" : "left" }]}>
+                    {t("productDetail.warrantyFromInstallNote")}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          </>
+        ) : null}
 
         {product.serial || product.imei ? (
           <>
@@ -199,9 +314,17 @@ export default function ProductDetailScreen() {
                   void Linking.openURL(`tel:${importerEntry.phone}`);
                 }}
               >
-                <View style={[styles.serviceRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
-                  <Ionicons color={colors.accent} name="call-outline" size={18} />
-                  <Text style={[styles.servicePhone, { textAlign: isRTL ? "right" : "left" }]}>{importerEntry.phone}</Text>
+                <View style={[styles.servicePhoneRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+                  <View style={[styles.serviceRow, styles.servicePhoneLabelGroup, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+                    <Ionicons color={colors.accent} name="call-outline" size={18} />
+                    <Text style={[styles.detailLabel, styles.servicePhoneLabel, { textAlign: isRTL ? "right" : "left" }]}>
+                      {t("product.importerPhone")}
+                    </Text>
+                  </View>
+                  <View style={[styles.servicePhonePill, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+                    <Ionicons color={colors.primary} name="call-outline" size={14} />
+                    <Text style={[styles.servicePhonePillText, { textAlign: isRTL ? "left" : "right" }]}>{importerEntry.phone}</Text>
+                  </View>
                 </View>
               </Pressable>
               {importerEntry.hours ? (
@@ -243,16 +366,28 @@ export default function ProductDetailScreen() {
           </>
         ) : null}
 
-        {resolvedReceiptUri ? (
+        {documentItems.length > 0 ? (
           <>
-            <SectionLabel isRTL={isRTL} label={t("product.receipt")} />
-            <View style={styles.sectionCard}>
-              <Pressable onPress={() => setReceiptPreviewVisible(true)}>
-                <Image resizeMode="cover" source={{ uri: resolvedReceiptUri }} style={styles.receiptImage} />
-              </Pressable>
+            <SectionLabel isRTL={isRTL} label={t("productDetail.documentsSection")} />
+            <View style={[styles.documentsGrid, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+              {documentItems.map((item) => (
+                <Pressable
+                  key={item.key}
+                  onPress={() => {
+                    setReceiptPreviewUri(item.uri);
+                    setReceiptPreviewVisible(true);
+                  }}
+                  style={[styles.documentCard, documentItems.length === 1 ? styles.documentCardFull : styles.documentCardHalf]}
+                >
+                  <Image resizeMode="cover" source={{ uri: item.uri }} style={styles.receiptImage} />
+                  <Text style={[styles.documentLabel, { textAlign: isRTL ? "right" : "left" }]}>{item.label}</Text>
+                </Pressable>
+              ))}
             </View>
           </>
         ) : null}
+
+        <View style={styles.actionsSeparator} />
 
         <Pressable onPress={handleEdit} style={styles.editButton}>
           <Text style={styles.editButtonText}>{t("productDetail.editProduct")}</Text>
@@ -270,13 +405,14 @@ export default function ProductDetailScreen() {
           <Pressable
             onPress={() => {
               setReceiptPreviewVisible(false);
+              setReceiptPreviewUri(null);
             }}
             style={[styles.receiptPreviewClose, { alignSelf: isRTL ? "flex-start" : "flex-end" }]}
           >
             <Text style={styles.receiptPreviewCloseText}>{t("common.cancel")}</Text>
           </Pressable>
-          {resolvedReceiptUri ? (
-            <Image resizeMode="contain" source={{ uri: resolvedReceiptUri }} style={styles.receiptPreviewFullscreenImage} />
+          {receiptPreviewUri ? (
+            <Image resizeMode="contain" source={{ uri: receiptPreviewUri }} style={styles.receiptPreviewFullscreenImage} />
           ) : null}
         </View>
       </Modal>
@@ -339,10 +475,39 @@ const makeStyles = (c: ColorPalette) =>
       flex: 1,
       backgroundColor: c.background,
     },
+    loadingScreen: {
+      flex: 1,
+      backgroundColor: c.background,
+      paddingHorizontal: 20,
+      paddingBottom: 24,
+    },
     content: {
       padding: 16,
       gap: 8,
       paddingBottom: 32,
+    },
+    screenHeaderRow: {
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+    },
+    screenHeaderButton: {
+      width: 40,
+      height: 40,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    screenHeaderSpacer: {
+      width: 40,
+      height: 40,
+    },
+    screenHeaderTitle: {
+      flex: 1,
+      color: c.text,
+      fontSize: fontSizes.xl,
+      lineHeight: lineHeights.xl,
+      fontFamily: fontFamilies.bold,
+      textAlign: "center",
     },
     centerState: {
       flex: 1,
@@ -360,8 +525,9 @@ const makeStyles = (c: ColorPalette) =>
     },
     notFoundText: {
       color: c.text,
-      fontSize: 18,
-      fontWeight: "700",
+      fontSize: fontSizes.lg,
+      lineHeight: lineHeights.lg,
+      fontFamily: fontFamilies.semibold,
     },
     backButton: {
       minHeight: 48,
@@ -373,8 +539,9 @@ const makeStyles = (c: ColorPalette) =>
     },
     backButtonText: {
       color: c.surface,
-      fontSize: 14,
-      fontWeight: "700",
+      fontSize: fontSizes.md,
+      lineHeight: lineHeights.md,
+      fontFamily: fontFamilies.semibold,
     },
     headerCard: {
       backgroundColor: c.surface,
@@ -399,16 +566,18 @@ const makeStyles = (c: ColorPalette) =>
     },
     title: {
       color: c.text,
-      fontSize: 24,
-      fontWeight: "700",
+      fontSize: fontSizes.xxl,
+      lineHeight: lineHeights.xxl,
+      fontFamily: fontFamilies.bold,
     },
     metaRows: {
       gap: 10,
     },
     sectionLabel: {
       color: c.textSubtle,
-      fontSize: 11,
-      fontWeight: "700",
+      fontSize: fontSizes.xs,
+      lineHeight: lineHeights.xs,
+      fontFamily: fontFamilies.semibold,
       letterSpacing: 0.8,
       textTransform: "uppercase",
       marginTop: 6,
@@ -432,22 +601,68 @@ const makeStyles = (c: ColorPalette) =>
     detailLabel: {
       flex: 1,
       color: c.textSubtle,
-      fontSize: 13,
-      fontWeight: "600",
+      fontSize: fontSizes.sm,
+      lineHeight: lineHeights.sm,
+      fontFamily: fontFamilies.medium,
     },
     detailValue: {
       flex: 1,
       color: c.text,
-      fontSize: 14,
+      fontSize: fontSizes.sm,
+      lineHeight: lineHeights.sm,
+      fontFamily: fontFamilies.regular,
     },
     detailValueInteractive: {
       color: c.primary,
-      fontWeight: "600",
+      fontFamily: fontFamilies.semibold,
+    },
+    infoRow: {
+      alignItems: "flex-start",
+      gap: 8,
+    },
+    infoRowText: {
+      flex: 1,
+      color: c.accent,
+      fontSize: fontSizes.xs,
+      lineHeight: lineHeights.xs,
+      fontFamily: fontFamilies.medium,
     },
     receiptImage: {
       width: "100%",
       height: 200,
       borderRadius: 12,
+    },
+    documentsGrid: {
+      gap: 12,
+      alignItems: "stretch",
+      flexWrap: "nowrap",
+    },
+    documentCard: {
+      backgroundColor: c.surface,
+      borderRadius: 22,
+      borderWidth: 1,
+      borderColor: c.border,
+      padding: 12,
+      gap: 10,
+    },
+    documentCardFull: {
+      width: "100%",
+    },
+    documentCardHalf: {
+      width: "48%",
+    },
+    documentLabel: {
+      color: c.textMuted,
+      fontSize: fontSizes.sm,
+      lineHeight: lineHeights.sm,
+      fontFamily: fontFamilies.medium,
+    },
+    actionsSeparator: {
+      height: 1,
+      backgroundColor: c.border,
+      marginTop: 18,
+      marginBottom: 18,
+      opacity: 0.7,
     },
     receiptPreviewOverlay: {
       flex: 1,
@@ -465,8 +680,9 @@ const makeStyles = (c: ColorPalette) =>
     },
     receiptPreviewCloseText: {
       color: "#ffffff",
-      fontSize: 16,
-      fontWeight: "700",
+      fontSize: fontSizes.md,
+      lineHeight: lineHeights.md,
+      fontFamily: fontFamilies.bold,
     },
     receiptPreviewFullscreenImage: {
       width: "100%",
@@ -482,20 +698,46 @@ const makeStyles = (c: ColorPalette) =>
       alignItems: "center",
       gap: 10,
     },
+    servicePhoneRow: {
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+    },
+    servicePhoneLabelGroup: {
+      flex: 1,
+    },
+    servicePhoneLabel: {
+      flex: 0,
+      color: c.text,
+    },
     serviceName: {
       color: c.text,
-      fontSize: 16,
-      fontWeight: "700",
+      fontSize: fontSizes.md,
+      lineHeight: lineHeights.md,
+      fontFamily: fontFamilies.semibold,
     },
-    servicePhone: {
-      color: c.accent,
-      fontSize: 15,
-      fontWeight: "700",
+    servicePhonePill: {
+      borderWidth: 1,
+      borderColor: c.primary,
+      backgroundColor: c.primarySoft,
+      borderRadius: 999,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      alignItems: "center",
+      gap: 6,
+      flexShrink: 0,
+    },
+    servicePhonePillText: {
+      color: c.primary,
+      fontSize: fontSizes.sm,
+      lineHeight: lineHeights.sm,
+      fontFamily: fontFamilies.semibold,
     },
     serviceHours: {
       color: c.textMuted,
-      fontSize: 13,
-      lineHeight: 20,
+      fontSize: fontSizes.sm,
+      lineHeight: lineHeights.sm,
+      fontFamily: fontFamilies.regular,
     },
     notesRow: {
       gap: 10,
@@ -507,8 +749,9 @@ const makeStyles = (c: ColorPalette) =>
     notesText: {
       flex: 1,
       color: c.text,
-      fontSize: 14,
-      lineHeight: 22,
+      fontSize: fontSizes.sm,
+      lineHeight: lineHeights.sm,
+      fontFamily: fontFamilies.regular,
     },
     deleteButton: {
       minHeight: 48,
@@ -526,17 +769,20 @@ const makeStyles = (c: ColorPalette) =>
     },
     editButtonText: {
       color: c.surface,
-      fontSize: 15,
-      fontWeight: "700",
+      fontSize: fontSizes.md,
+      lineHeight: lineHeights.md,
+      fontFamily: fontFamilies.semibold,
     },
     deleteButtonText: {
       color: c.danger,
-      fontSize: 15,
-      fontWeight: "700",
+      fontSize: fontSizes.md,
+      lineHeight: lineHeights.md,
+      fontFamily: fontFamilies.semibold,
     },
     errorText: {
       color: c.danger,
-      fontSize: 13,
-      lineHeight: 20,
+      fontSize: fontSizes.sm,
+      lineHeight: lineHeights.sm,
+      fontFamily: fontFamilies.regular,
     },
   });

@@ -2,10 +2,12 @@ import { Ionicons } from "@expo/vector-icons";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useMemo } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { CATEGORY_LABEL_KEYS, CATEGORY_OPTIONS, type CategoryOption } from "../../src/constants/categories";
 import { getCategoryIcon } from "../../src/constants/categoryIcons";
 import { type ColorPalette } from "../../src/constants/colors";
+import { fontFamilies, fontSizes, lineHeights } from "../../src/constants/typography";
 import { useI18n } from "../../src/hooks/useI18n";
 import { useThemeColors } from "../../src/hooks/useThemeColors";
 import { resolveCategoryPicker } from "../../src/utils/categoryPickerCallback";
@@ -15,15 +17,30 @@ export default function CategoryPickerScreen() {
   const { t, isRTL } = useI18n();
   const colors = useThemeColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const insets = useSafeAreaInsets();
   const selectedCategory = CATEGORY_OPTIONS.includes(selected as CategoryOption) ? (selected as CategoryOption) : "other";
 
   return (
     <>
-      <Stack.Screen options={{ title: t("addProduct.categoryPickerTitle"), headerShown: true }} />
+      <Stack.Screen options={{ headerShown: false }} />
       <FlatList
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}
         data={CATEGORY_OPTIONS}
         keyExtractor={(item) => item}
+        ListHeaderComponent={
+          <View style={[styles.headerRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+            <Pressable
+              onPress={() => {
+                router.back();
+              }}
+              style={styles.headerButton}
+            >
+              <Ionicons color={colors.text} name={isRTL ? "chevron-forward" : "chevron-back"} size={22} />
+            </Pressable>
+            <Text style={styles.headerTitle}>{t("addProduct.categoryPickerTitle")}</Text>
+            <View style={styles.headerSpacer} />
+          </View>
+        }
         renderItem={({ item }) => {
           const isSelected = item === selectedCategory;
 
@@ -57,6 +74,31 @@ const makeStyles = (c: ColorPalette) =>
     },
     content: {
       padding: 16,
+      gap: 10,
+    },
+    headerRow: {
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+      marginBottom: 6,
+    },
+    headerButton: {
+      width: 40,
+      height: 40,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    headerSpacer: {
+      width: 40,
+      height: 40,
+    },
+    headerTitle: {
+      flex: 1,
+      color: c.text,
+      fontSize: fontSizes.xl,
+      lineHeight: lineHeights.xl,
+      fontFamily: fontFamilies.bold,
+      textAlign: "center",
     },
     row: {
       minHeight: 56,
@@ -67,7 +109,6 @@ const makeStyles = (c: ColorPalette) =>
       paddingHorizontal: 16,
       alignItems: "center",
       gap: 12,
-      marginBottom: 10,
     },
     iconWrap: {
       width: 36,
@@ -80,7 +121,8 @@ const makeStyles = (c: ColorPalette) =>
     rowLabel: {
       flex: 1,
       color: c.text,
-      fontSize: 15,
-      fontWeight: "600",
+      fontSize: fontSizes.md,
+      lineHeight: lineHeights.md,
+      fontFamily: fontFamilies.semibold,
     },
   });

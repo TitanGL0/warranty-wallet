@@ -14,16 +14,19 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { FormField } from "../../src/components/FormField";
 import { CATEGORY_LABEL_KEYS, CATEGORY_OPTIONS, type CategoryOption } from "../../src/constants/categories";
 import { getCategoryIcon } from "../../src/constants/categoryIcons";
 import { type ColorPalette } from "../../src/constants/colors";
 import { IMPORTERS } from "../../src/constants/importers";
+import { fontFamilies, fontSizes, lineHeights } from "../../src/constants/typography";
 import { useProducts } from "../../src/hooks/useProducts";
 import { useI18n } from "../../src/hooks/useI18n";
 import { useThemeColors } from "../../src/hooks/useThemeColors";
@@ -122,6 +125,13 @@ export default function AddProductScreen() {
   const [notes, setNotes] = useState("");
   const [price, setPrice] = useState("");
   const [currency, setCurrency] = useState<(typeof CURRENCY_OPTIONS)[number]>("ILS");
+  const [requiresInstallation, setRequiresInstallation] = useState(false);
+  const [installationDate, setInstallationDate] = useState("");
+  const [installerName, setInstallerName] = useState("");
+  const [installationNotes, setInstallationNotes] = useState("");
+  const [installLocalUri, setInstallLocalUri] = useState<string | null>(null);
+  const [existingInstallUrl, setExistingInstallUrl] = useState<string | null>(null);
+  const [originalInstallUrl, setOriginalInstallUrl] = useState<string | null>(null);
   const [receiptLocalUri, setReceiptLocalUri] = useState<string | null>(null);
   const [existingReceiptUrl, setExistingReceiptUrl] = useState<string | null>(null);
   const [originalReceiptUrl, setOriginalReceiptUrl] = useState<string | null>(null);
@@ -129,11 +139,13 @@ export default function AddProductScreen() {
   const [errorKey, setErrorKey] = useState<TranslationKey | null>(null);
   const [statusKey, setStatusKey] = useState<TranslationKey | null>(null);
   const [formReady, setFormReady] = useState(!isEditMode);
-  const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
+  const [datePickerTarget, setDatePickerTarget] = useState<"purchase" | "installation" | null>(null);
   const [receiptPreviewVisible, setReceiptPreviewVisible] = useState(false);
+  const [receiptPreviewUri, setReceiptPreviewUri] = useState<string | null>(null);
   const [tempSelectedDate, setTempSelectedDate] = useState(() => new Date());
   const [pendingNavigation, setPendingNavigation] = useState<NavigationTarget | null>(null);
   const mountedRef = useRef(true);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     return () => {
@@ -168,6 +180,12 @@ export default function AddProductScreen() {
         ? (existingProduct.currency as (typeof CURRENCY_OPTIONS)[number])
         : "ILS",
     );
+    setRequiresInstallation(existingProduct.requiresInstallation ?? false);
+    setInstallationDate(existingProduct.installationDate ?? "");
+    setInstallerName(existingProduct.installerName ?? "");
+    setInstallationNotes(existingProduct.installationNotes ?? "");
+    setExistingInstallUrl(existingProduct.installationImageUrl ?? null);
+    setOriginalInstallUrl(existingProduct.installationImageUrl ?? null);
     setExistingReceiptUrl(existingProduct.receiptImageUrl ?? null);
     setOriginalReceiptUrl(existingProduct.receiptImageUrl ?? null);
     setFormReady(true);
@@ -202,12 +220,15 @@ export default function AddProductScreen() {
   const selectedCategoryLabel = t(CATEGORY_LABEL_KEYS[category]);
   const selectedCategoryIcon = getCategoryIcon(category);
   const resolvedExistingReceiptUri = resolveReceiptUri(existingReceiptUrl);
-  const activeReceiptUri = receiptLocalUri ?? resolvedExistingReceiptUri;
+  const resolvedExistingInstallUri = resolveReceiptUri(existingInstallUrl);
 
-  const openCalendar = () => {
-    const baseDate = purchaseDate && isValidDate(purchaseDate) ? parseIsoDate(purchaseDate) : new Date();
-    setTempSelectedDate(baseDate);
-    setIsDatePickerVisible(true);
+  const openCalendar = (target: "purchase" | "installation") => {
+    const current =
+      target === "purchase"
+        ? (purchaseDate && isValidDate(purchaseDate) ? parseIsoDate(purchaseDate) : new Date())
+        : (installationDate && isValidDate(installationDate) ? parseIsoDate(installationDate) : new Date());
+    setTempSelectedDate(current);
+    setDatePickerTarget(target);
   };
 
   const handleImporterBlur = () => {
@@ -255,12 +276,21 @@ export default function AddProductScreen() {
 
   const handleDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
     if (Platform.OS === "android") {
-      setIsDatePickerVisible(false);
+      if (event.type !== "set") {
+        setDatePickerTarget(null);
+        return;
+      }
 
       if (event.type === "set" && selectedDate) {
-        setPurchaseDate(toIsoDate(selectedDate));
+        if (datePickerTarget === "purchase") {
+          setPurchaseDate(toIsoDate(selectedDate));
+        } else if (datePickerTarget === "installation") {
+          setInstallationDate(toIsoDate(selectedDate));
+        }
         setStatusKey(null);
       }
+
+      setDatePickerTarget(null);
 
       return;
     }
@@ -271,9 +301,17 @@ export default function AddProductScreen() {
   };
 
   const confirmDateSelection = () => {
-    setPurchaseDate(toIsoDate(tempSelectedDate));
-    setStatusKey(null);
-    setIsDatePickerVisible(false);
+    const nextDate = toIsoDate(tempSelectedDate);
+
+    if (datePickerTarget === "purchase") {
+      setPurchaseDate(nextDate);
+      setStatusKey(null);
+    } else if (datePickerTarget === "installation") {
+      setInstallationDate(nextDate);
+      setStatusKey(null);
+    }
+
+    setDatePickerTarget(null);
   };
 
   const handlePickImage = async () => {
@@ -317,6 +355,47 @@ export default function AddProductScreen() {
     }
   };
 
+  const handlePickInstallImage = async () => {
+    let permission = await ImagePicker.getMediaLibraryPermissionsAsync();
+
+    if (permission.status !== "granted" && permission.canAskAgain !== false) {
+      permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    }
+
+    if (permission.status !== "granted") {
+      setErrorKey("error.product.receiptPermissionDenied");
+
+      if (permission.canAskAgain === false) {
+        Alert.alert(t("common.error"), t("error.product.receiptPermissionDenied"), [
+          { text: t("common.cancel"), style: "cancel" },
+          {
+            text: t("common.openSettings"),
+            onPress: () => {
+              void Linking.openSettings();
+            },
+          },
+        ]);
+      }
+
+      return;
+    }
+
+    setErrorKey(null);
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      quality: 0.7,
+      allowsEditing: false,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      setInstallLocalUri(result.assets[0].uri);
+      setExistingInstallUrl(null);
+      setErrorKey(null);
+      setStatusKey(null);
+    }
+  };
+
   const handleSave = async () => {
     if (isSubmitting) {
       return;
@@ -348,6 +427,11 @@ export default function AddProductScreen() {
       serial: serial.trim(),
       imei: imei.trim(),
       purchaseDate: purchaseDate.trim(),
+      requiresInstallation,
+      installationDate: requiresInstallation ? (installationDate.trim() || null) : null,
+      installerName: requiresInstallation ? (installerName.trim() || null) : null,
+      installationNotes: requiresInstallation ? (installationNotes.trim() || null) : null,
+      installationImageUrl: null,
       warrantyMonths,
       importer: importer.trim(),
       importerPhone: importerPhone.trim(),
@@ -362,13 +446,32 @@ export default function AddProductScreen() {
     try {
       if (isEditMode && productId) {
         await withTimeout(
-          updateProduct(uid, productId, input, receiptLocalUri ?? null, existingReceiptUrl ?? null, originalReceiptUrl ?? null),
+          updateProduct(
+            uid,
+            productId,
+            input,
+            receiptLocalUri ?? null,
+            existingReceiptUrl ?? null,
+            originalReceiptUrl ?? null,
+            requiresInstallation ? installLocalUri ?? null : null,
+            requiresInstallation ? existingInstallUrl ?? null : null,
+            originalInstallUrl ?? null,
+          ),
           15000,
           "updateProduct",
         );
         nextTarget = { pathname: "/product/[id]", params: { id: productId } };
       } else {
-        await withTimeout(addProduct(uid, input, receiptLocalUri ?? null), 15000, "addProduct");
+        await withTimeout(
+          addProduct(
+            uid,
+            input,
+            receiptLocalUri ?? null,
+            requiresInstallation ? installLocalUri ?? null : null,
+          ),
+          15000,
+          "addProduct",
+        );
         nextTarget = { pathname: "/(tabs)" };
       }
     } catch (error) {
@@ -400,18 +503,33 @@ export default function AddProductScreen() {
 
   return (
     <>
-      <Stack.Screen
-        options={
-          {
-            title: isEditMode ? t("editProduct.title") : t("addProduct.title"),
-            headerBackTitleVisible: false,
-            headerBackTitle: "",
-            headerBackButtonDisplayMode: "minimal",
-          } as unknown as Parameters<typeof Stack.Screen>[0]["options"]
-        }
-      />
+      <Stack.Screen options={{ headerShown: false }} />
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.screen}>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={[styles.screenHeaderRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+            <Pressable
+              onPress={() => {
+                router.back();
+              }}
+              style={styles.screenHeaderButton}
+            >
+              <Ionicons color={colors.text} name={isRTL ? "chevron-forward" : "chevron-back"} size={22} />
+            </Pressable>
+            <Text style={styles.screenHeaderTitle}>{isEditMode ? t("editProduct.title") : t("addProduct.title")}</Text>
+            <Pressable
+              disabled={isSubmitting}
+              onPress={() => {
+                void handleSave();
+              }}
+              style={[styles.screenHeaderAction, isSubmitting && styles.inputDisabled]}
+            >
+              <Text style={styles.screenHeaderActionText}>{t("common.save")}</Text>
+            </Pressable>
+          </View>
           <SectionLabel isRTL={isRTL} title={t("addProduct.sectionProductInfo")} />
           <View style={styles.sectionCard}>
             <FormField label={t("product.name")} required>
@@ -452,12 +570,136 @@ export default function AddProductScreen() {
                 <Ionicons color={colors.textSubtle} name={isRTL ? "chevron-back" : "chevron-forward"} size={18} />
               </Pressable>
             </FormField>
+
+            <View style={styles.divider} />
+            <View style={[styles.toggleRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+              <View style={styles.toggleTextBlock}>
+                <Text style={[styles.toggleLabel, { textAlign: isRTL ? "right" : "left" }]}>
+                  {t("addProduct.requiresInstallation")}
+                </Text>
+                <Text style={[styles.toggleHint, { textAlign: isRTL ? "right" : "left" }]}>
+                  {t("addProduct.requiresInstallationHint")}
+                </Text>
+              </View>
+              <Switch
+                disabled={isSubmitting}
+                onValueChange={setRequiresInstallation}
+                thumbColor={colors.surface}
+                trackColor={{ false: colors.border, true: colors.accent }}
+                value={requiresInstallation}
+              />
+            </View>
           </View>
+
+          {requiresInstallation ? (
+            <>
+              <SectionLabel isRTL={isRTL} title={t("addProduct.sectionInstallation")} />
+              <View style={styles.sectionCard}>
+                <FormField label={t("product.installationDate")}>
+                  <Pressable
+                    disabled={isSubmitting}
+                    onPress={() => openCalendar("installation")}
+                    style={[styles.dateField, isSubmitting && styles.inputDisabled]}
+                  >
+                    <View style={[styles.dateFieldContent, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+                      <View style={[styles.dateFieldIconWrap, { backgroundColor: colors.primarySoft }]}>
+                        <Ionicons color={colors.primary} name="calendar-outline" size={18} />
+                      </View>
+                      <View style={styles.dateFieldTextWrap}>
+                        <Text
+                          style={[
+                            styles.dateFieldText,
+                            !installationDate && styles.dateFieldPlaceholder,
+                            { textAlign: isRTL ? "right" : "left" },
+                          ]}
+                        >
+                          {installationDate
+                            ? formatDateDisplay(installationDate, language)
+                            : t("addProduct.datePlaceholder")}
+                        </Text>
+                      </View>
+                      <Ionicons color={colors.textSubtle} name={isRTL ? "chevron-back" : "chevron-forward"} size={18} />
+                    </View>
+                  </Pressable>
+                </FormField>
+
+                <FormField label={t("product.installerName")}>
+                  <TextInput
+                    editable={!isSubmitting}
+                    placeholder={t("addProduct.placeholder.installerName")}
+                    placeholderTextColor={colors.textSubtle}
+                    style={[...inputStyle, isSubmitting && styles.inputDisabled]}
+                    value={installerName}
+                    onChangeText={setInstallerName}
+                  />
+                </FormField>
+
+                <FormField label={t("product.installationNotes")}>
+                  <TextInput
+                    editable={!isSubmitting}
+                    multiline
+                    placeholder={t("addProduct.placeholder.installationNotes")}
+                    placeholderTextColor={colors.textSubtle}
+                    style={[...inputStyle, styles.notesInput, isSubmitting && styles.inputDisabled]}
+                    textAlignVertical="top"
+                    value={installationNotes}
+                    onChangeText={setInstallationNotes}
+                  />
+                </FormField>
+
+                <FormField label={t("product.installationCertificate")}>
+                  {installLocalUri ? (
+                    <View style={styles.receiptPreview}>
+                      <Pressable
+                        onPress={() => {
+                          setReceiptPreviewUri(installLocalUri);
+                          setReceiptPreviewVisible(true);
+                        }}
+                      >
+                        <Image resizeMode="cover" source={{ uri: installLocalUri }} style={styles.receiptImage} />
+                      </Pressable>
+                      <Pressable onPress={() => setInstallLocalUri(null)} style={styles.removeReceiptBtn}>
+                        <Text style={styles.removeReceiptText}>{t("product.installationCertificateRemove")}</Text>
+                      </Pressable>
+                    </View>
+                  ) : resolvedExistingInstallUri ? (
+                    <View style={styles.receiptPreview}>
+                      <Pressable
+                        onPress={() => {
+                          setReceiptPreviewUri(resolvedExistingInstallUri);
+                          setReceiptPreviewVisible(true);
+                        }}
+                      >
+                        <Image resizeMode="cover" source={{ uri: resolvedExistingInstallUri }} style={styles.receiptImage} />
+                      </Pressable>
+                      <Pressable onPress={() => setExistingInstallUrl(null)} style={styles.removeReceiptBtn}>
+                        <Text style={styles.removeReceiptText}>{t("product.installationCertificateRemove")}</Text>
+                      </Pressable>
+                    </View>
+                  ) : (
+                    <Pressable
+                      disabled={isSubmitting}
+                      onPress={() => void handlePickInstallImage()}
+                      style={styles.receiptPickerBtn}
+                    >
+                      <Text style={[styles.receiptPickerText, { textAlign: isRTL ? "right" : "left" }]}>
+                        {t("product.installationCertificateAttach")}
+                      </Text>
+                    </Pressable>
+                  )}
+                </FormField>
+              </View>
+            </>
+          ) : null}
 
           <SectionLabel isRTL={isRTL} title={t("addProduct.sectionWarranty")} />
           <View style={styles.sectionCard}>
             <FormField label={t("product.purchaseDate")} required>
-              <Pressable disabled={isSubmitting} onPress={openCalendar} style={[styles.dateField, isSubmitting && styles.inputDisabled]}>
+              <Pressable
+                disabled={isSubmitting}
+                onPress={() => openCalendar("purchase")}
+                style={[styles.dateField, isSubmitting && styles.inputDisabled]}
+              >
                 <View style={[styles.dateFieldContent, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
                   <View style={[styles.dateFieldIconWrap, { backgroundColor: colors.primarySoft }]}>
                     <Ionicons color={colors.primary} name="calendar-outline" size={18} />
@@ -511,6 +753,15 @@ export default function AddProductScreen() {
                 {formatWarrantyDuration(warrantyMonths, language)}
               </Text>
             </FormField>
+
+            {requiresInstallation && installationDate && installationDate > purchaseDate ? (
+              <View style={[styles.infoRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+                <Ionicons color={colors.accent} name="information-circle-outline" size={14} />
+                <Text style={[styles.infoRowText, { textAlign: isRTL ? "right" : "left" }]}>
+                  {t("addProduct.warrantyFromInstallHint")}
+                </Text>
+              </View>
+            ) : null}
           </View>
 
           <SectionLabel isRTL={isRTL} title={t("addProduct.sectionService")} />
@@ -608,7 +859,12 @@ export default function AddProductScreen() {
             <FormField label={t("product.receipt")}>
               {receiptLocalUri ? (
                 <View style={styles.receiptPreview}>
-                  <Pressable onPress={() => setReceiptPreviewVisible(true)}>
+                  <Pressable
+                    onPress={() => {
+                      setReceiptPreviewUri(receiptLocalUri);
+                      setReceiptPreviewVisible(true);
+                    }}
+                  >
                     <Image resizeMode="cover" source={{ uri: receiptLocalUri }} style={styles.receiptImage} />
                   </Pressable>
                   <Pressable
@@ -622,7 +878,12 @@ export default function AddProductScreen() {
                 </View>
               ) : resolvedExistingReceiptUri ? (
                 <View style={styles.receiptPreview}>
-                  <Pressable onPress={() => setReceiptPreviewVisible(true)}>
+                  <Pressable
+                    onPress={() => {
+                      setReceiptPreviewUri(resolvedExistingReceiptUri);
+                      setReceiptPreviewVisible(true);
+                    }}
+                  >
                     <Image resizeMode="cover" source={{ uri: resolvedExistingReceiptUri }} style={styles.receiptImage} />
                   </Pressable>
                   <Pressable
@@ -651,11 +912,11 @@ export default function AddProductScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {Platform.OS === "android" && isDatePickerVisible ? (
+      {Platform.OS === "android" && datePickerTarget !== null ? (
         <DateTimePicker display="default" mode="date" value={tempSelectedDate} onChange={handleDateChange} />
       ) : null}
 
-      <Modal animationType="fade" transparent visible={Platform.OS === "ios" && isDatePickerVisible}>
+      <Modal animationType="fade" transparent visible={Platform.OS === "ios" && datePickerTarget !== null}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalHandle} />
@@ -676,7 +937,7 @@ export default function AddProductScreen() {
             <View style={[styles.modalActions, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
               <Pressable
                 onPress={() => {
-                  setIsDatePickerVisible(false);
+                  setDatePickerTarget(null);
                 }}
                 style={styles.secondaryButton}
               >
@@ -695,12 +956,13 @@ export default function AddProductScreen() {
           <Pressable
             onPress={() => {
               setReceiptPreviewVisible(false);
+              setReceiptPreviewUri(null);
             }}
             style={[styles.receiptPreviewClose, { alignSelf: isRTL ? "flex-start" : "flex-end" }]}
           >
             <Text style={styles.receiptPreviewCloseText}>{t("common.cancel")}</Text>
           </Pressable>
-          {activeReceiptUri ? <Image resizeMode="contain" source={{ uri: activeReceiptUri }} style={styles.receiptPreviewFullscreenImage} /> : null}
+          {receiptPreviewUri ? <Image resizeMode="contain" source={{ uri: receiptPreviewUri }} style={styles.receiptPreviewFullscreenImage} /> : null}
         </View>
       </Modal>
     </>
@@ -756,6 +1018,37 @@ const makeStyles = (c: ColorPalette) =>
     gap: 14,
     paddingBottom: 32,
   },
+  screenHeaderRow: {
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  screenHeaderButton: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  screenHeaderTitle: {
+    flex: 1,
+    color: c.text,
+    fontSize: fontSizes.xl,
+    lineHeight: lineHeights.xl,
+    fontFamily: fontFamilies.bold,
+    textAlign: "center",
+  },
+  screenHeaderAction: {
+    minWidth: 40,
+    minHeight: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  screenHeaderActionText: {
+    color: c.primary,
+    fontSize: fontSizes.sm,
+    lineHeight: lineHeights.sm,
+    fontFamily: fontFamilies.semibold,
+  },
   centerState: {
     flex: 1,
     backgroundColor: c.background,
@@ -772,8 +1065,9 @@ const makeStyles = (c: ColorPalette) =>
   },
   notFoundText: {
     color: c.text,
-    fontSize: 18,
-    fontWeight: "700",
+    fontSize: fontSizes.lg,
+    lineHeight: lineHeights.lg,
+    fontFamily: fontFamilies.semibold,
   },
   backButton: {
     minHeight: 48,
@@ -785,13 +1079,15 @@ const makeStyles = (c: ColorPalette) =>
   },
   backButtonText: {
     color: c.surface,
-    fontSize: 14,
-    fontWeight: "700",
+    fontSize: fontSizes.md,
+    lineHeight: lineHeights.md,
+    fontFamily: fontFamilies.semibold,
   },
   sectionLabel: {
     color: c.textSubtle,
-    fontSize: 11,
-    fontWeight: "700",
+    fontSize: fontSizes.xs,
+    lineHeight: lineHeights.xs,
+    fontFamily: fontFamilies.semibold,
     letterSpacing: 1,
     textTransform: "uppercase",
   },
@@ -802,6 +1098,10 @@ const makeStyles = (c: ColorPalette) =>
     borderColor: c.border,
     padding: 16,
     gap: 14,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: c.border,
   },
   input: {
     minHeight: 48,
@@ -838,12 +1138,13 @@ const makeStyles = (c: ColorPalette) =>
   },
   dateFieldText: {
     color: c.text,
-    fontSize: 15,
-    fontWeight: "600",
+    fontSize: fontSizes.md,
+    lineHeight: lineHeights.md,
+    fontFamily: fontFamilies.semibold,
   },
   dateFieldPlaceholder: {
     color: c.textSubtle,
-    fontWeight: "500",
+    fontFamily: fontFamilies.medium,
   },
   inputDisabled: {
     opacity: 0.7,
@@ -867,15 +1168,17 @@ const makeStyles = (c: ColorPalette) =>
   },
   stepperBtnText: {
     color: c.text,
-    fontSize: 20,
-    fontWeight: "700",
+    fontSize: fontSizes.xl,
+    lineHeight: lineHeights.xl,
+    fontFamily: fontFamilies.bold,
     textAlign: "center",
   },
   stepperValue: {
     flex: 1,
     color: c.text,
-    fontSize: 15,
-    fontWeight: "600",
+    fontSize: fontSizes.md,
+    lineHeight: lineHeights.md,
+    fontFamily: fontFamilies.semibold,
     textAlign: "center",
   },
   stepperValueInput: {
@@ -887,14 +1190,48 @@ const makeStyles = (c: ColorPalette) =>
     backgroundColor: c.background,
     paddingHorizontal: 12,
     color: c.text,
-    fontSize: 16,
-    fontWeight: "700",
+    fontSize: fontSizes.md,
+    lineHeight: lineHeights.md,
+    fontFamily: fontFamilies.semibold,
   },
   stepperHint: {
     color: c.textMuted,
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: fontSizes.sm,
+    lineHeight: lineHeights.sm,
+    fontFamily: fontFamilies.regular,
     marginTop: 8,
+  },
+  toggleRow: {
+    minHeight: 52,
+    alignItems: "center",
+    gap: 12,
+  },
+  toggleTextBlock: {
+    flex: 1,
+    gap: 3,
+  },
+  toggleLabel: {
+    color: c.text,
+    fontSize: fontSizes.sm,
+    lineHeight: lineHeights.sm,
+    fontFamily: fontFamilies.semibold,
+  },
+  toggleHint: {
+    color: c.textSubtle,
+    fontSize: fontSizes.xs,
+    lineHeight: lineHeights.xs,
+    fontFamily: fontFamilies.regular,
+  },
+  infoRow: {
+    alignItems: "flex-start",
+    gap: 8,
+  },
+  infoRowText: {
+    flex: 1,
+    color: c.accent,
+    fontSize: fontSizes.xs,
+    lineHeight: lineHeights.xs,
+    fontFamily: fontFamilies.medium,
   },
   notesInput: {
     minHeight: 112,
@@ -915,8 +1252,9 @@ const makeStyles = (c: ColorPalette) =>
   },
   chipText: {
     color: c.text,
-    fontSize: 13,
-    fontWeight: "600",
+    fontSize: fontSizes.sm,
+    lineHeight: lineHeights.sm,
+    fontFamily: fontFamilies.medium,
   },
   chipTextSelected: {
     color: c.surface,
@@ -942,7 +1280,9 @@ const makeStyles = (c: ColorPalette) =>
   categoryValue: {
     flex: 1,
     color: c.text,
-    fontSize: 14,
+    fontSize: fontSizes.sm,
+    lineHeight: lineHeights.sm,
+    fontFamily: fontFamilies.regular,
   },
   priceRow: {
     alignItems: "flex-start",
@@ -971,7 +1311,9 @@ const makeStyles = (c: ColorPalette) =>
   },
   receiptPickerText: {
     color: c.textMuted,
-    fontSize: 14,
+    fontSize: fontSizes.sm,
+    lineHeight: lineHeights.sm,
+    fontFamily: fontFamilies.regular,
   },
   receiptPreview: {
     gap: 10,
@@ -997,8 +1339,9 @@ const makeStyles = (c: ColorPalette) =>
   },
   receiptPreviewCloseText: {
     color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "700",
+    fontSize: fontSizes.md,
+    lineHeight: lineHeights.md,
+    fontFamily: fontFamilies.bold,
   },
   receiptPreviewFullscreenImage: {
     width: "100%",
@@ -1010,8 +1353,9 @@ const makeStyles = (c: ColorPalette) =>
   },
   removeReceiptText: {
     color: c.danger,
-    fontSize: 13,
-    fontWeight: "700",
+    fontSize: fontSizes.sm,
+    lineHeight: lineHeights.sm,
+    fontFamily: fontFamilies.semibold,
   },
   saveButton: {
     minHeight: 48,
@@ -1023,18 +1367,21 @@ const makeStyles = (c: ColorPalette) =>
   },
   saveButtonText: {
     color: c.surface,
-    fontSize: 15,
-    fontWeight: "700",
+    fontSize: fontSizes.md,
+    lineHeight: lineHeights.md,
+    fontFamily: fontFamilies.semibold,
   },
   statusText: {
     color: c.accent,
-    fontSize: 13,
-    lineHeight: 20,
+    fontSize: fontSizes.sm,
+    lineHeight: lineHeights.sm,
+    fontFamily: fontFamilies.regular,
   },
   errorText: {
     color: c.danger,
-    fontSize: 13,
-    lineHeight: 20,
+    fontSize: fontSizes.sm,
+    lineHeight: lineHeights.sm,
+    fontFamily: fontFamilies.regular,
   },
   modalOverlay: {
     flex: 1,
@@ -1057,13 +1404,15 @@ const makeStyles = (c: ColorPalette) =>
   },
   modalTitle: {
     color: c.text,
-    fontSize: 18,
-    fontWeight: "700",
+    fontSize: fontSizes.lg,
+    lineHeight: lineHeights.lg,
+    fontFamily: fontFamilies.semibold,
   },
   modalSubtitle: {
     color: c.textMuted,
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: fontSizes.sm,
+    lineHeight: lineHeights.sm,
+    fontFamily: fontFamilies.regular,
     marginTop: -8,
   },
   iosDatePicker: {
@@ -1083,8 +1432,9 @@ const makeStyles = (c: ColorPalette) =>
   },
   secondaryButtonText: {
     color: c.text,
-    fontSize: 14,
-    fontWeight: "700",
+    fontSize: fontSizes.md,
+    lineHeight: lineHeights.md,
+    fontFamily: fontFamilies.semibold,
   },
   primaryModalButton: {
     flex: 1,
@@ -1096,7 +1446,8 @@ const makeStyles = (c: ColorPalette) =>
   },
   primaryModalButtonText: {
     color: c.surface,
-    fontSize: 14,
-    fontWeight: "700",
+    fontSize: fontSizes.md,
+    lineHeight: lineHeights.md,
+    fontFamily: fontFamilies.semibold,
   },
 });

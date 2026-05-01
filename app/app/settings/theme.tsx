@@ -1,9 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Stack } from "expo-router";
+import { Stack, router } from "expo-router";
 import { Children, type ReactNode, useMemo } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { type ColorPalette } from "../../src/constants/colors";
+import { fontFamilies, fontSizes, lineHeights } from "../../src/constants/typography";
 import { useI18n } from "../../src/hooks/useI18n";
 import { useThemeColors } from "../../src/hooks/useThemeColors";
 import { useSettingsStore } from "../../src/store/settingsStore";
@@ -25,11 +27,28 @@ export default function ThemeSettingsScreen() {
   const { t, isRTL } = useI18n();
   const theme = useSettingsStore((state) => state.theme);
   const setTheme = useSettingsStore((state) => state.setTheme);
+  const insets = useSafeAreaInsets();
 
   return (
     <>
-      <Stack.Screen options={{ headerShown: true, title: t("settings.theme") }} />
-      <ScrollView contentContainerStyle={styles.content} style={styles.screen} showsVerticalScrollIndicator={false}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}
+        style={styles.screen}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={[styles.headerRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+          <Pressable
+            onPress={() => {
+              router.back();
+            }}
+            style={styles.headerButton}
+          >
+            <Ionicons color={colors.text} name={isRTL ? "chevron-forward" : "chevron-back"} size={22} />
+          </Pressable>
+          <Text style={styles.headerTitle}>{t("settings.theme")}</Text>
+          <View style={styles.headerSpacer} />
+        </View>
         <SettingsCard>
           {THEME_OPTIONS.map((option) => {
             const selected = option.value === theme;
@@ -85,6 +104,29 @@ const makeStyles = (c: ColorPalette) =>
       padding: 16,
       gap: 16,
       paddingBottom: 32,
+    },
+    headerRow: {
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+    },
+    headerButton: {
+      width: 40,
+      height: 40,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    headerSpacer: {
+      width: 40,
+      height: 40,
+    },
+    headerTitle: {
+      flex: 1,
+      color: c.text,
+      fontSize: fontSizes.xl,
+      lineHeight: lineHeights.xl,
+      fontFamily: fontFamilies.bold,
+      textAlign: "center",
     },
     settingsCard: {
       backgroundColor: c.surface,

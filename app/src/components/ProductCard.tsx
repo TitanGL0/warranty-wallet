@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { getCategoryIcon } from "../constants/categoryIcons";
 import { type ColorPalette } from "../constants/colors";
+import { fontFamilies, fontSizes, lineHeights, radii } from "../constants/typography";
 import { useI18n } from "../hooks/useI18n";
 import { useThemeColors } from "../hooks/useThemeColors";
 import type { Language, Product } from "../types";
@@ -40,21 +41,28 @@ export function ProductCard({ product, onPress, language }: ProductCardProps) {
   const { isRTL, t } = useI18n();
   const daysLeft = getDaysLeft(product.warrantyEnd);
   const categoryIcon = getCategoryIcon(product.category);
-  const iconBg =
-    product.status === "valid"
-      ? colors.accentSoft
-      : product.status === "expiringSoon"
-        ? colors.warningSoft
-        : colors.dangerSoft;
   const iconColor =
     product.status === "valid"
       ? colors.accent
       : product.status === "expiringSoon"
         ? colors.warning
         : colors.danger;
+  const iconBorderColor =
+    product.status === "valid"
+      ? `${colors.accent}26`
+      : product.status === "expiringSoon"
+        ? `${colors.warning}26`
+        : `${colors.danger}26`;
+  const stripeColor =
+    product.status === "valid" ? colors.accent : product.status === "expiringSoon" ? colors.warning : colors.danger;
   const isIncomplete =
     !product.receiptImageUrl ||
-    (!product.serial && !product.imei);
+    (!product.serial && !product.imei) ||
+    (product.requiresInstallation && !product.installationDate) ||
+    (product.requiresInstallation && !product.installationImageUrl);
+  const stripeStyle = isRTL
+    ? { borderRightWidth: 3, borderRightColor: stripeColor }
+    : { borderLeftWidth: 3, borderLeftColor: stripeColor };
   const hasSubtitle = Boolean(product.brand || product.category);
   const categoryLabel =
     product.category && product.category in CATEGORY_LABEL_KEYS
@@ -75,11 +83,12 @@ export function ProductCard({ product, onPress, language }: ProductCardProps) {
       onPress={onPress}
       style={({ pressed }) => [
         styles.card,
+        stripeStyle,
         { opacity: pressed ? 0.85 : 1 },
       ]}
     >
       <View style={[styles.topRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
-        <View style={[styles.iconBlock, { backgroundColor: iconBg }]}>
+        <View style={[styles.iconBlock, { backgroundColor: colors.background, borderColor: iconBorderColor }]}>
           <Ionicons color={iconColor} name={categoryIcon} size={20} />
         </View>
         <Text numberOfLines={1} style={[styles.name, { textAlign: isRTL ? "right" : "left" }]}>
@@ -106,16 +115,19 @@ const makeStyles = (c: ColorPalette) =>
   StyleSheet.create({
     card: {
       backgroundColor: c.surface,
-      borderRadius: 16,
+      borderRadius: radii.xl,
       borderWidth: 1,
       borderColor: c.border,
-      padding: 14,
-      gap: 6,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      gap: 8,
+      overflow: "hidden",
     },
     iconBlock: {
       width: 40,
       height: 40,
-      borderRadius: 12,
+      borderRadius: radii.lg,
+      borderWidth: 1,
       alignItems: "center",
       justifyContent: "center",
       flexShrink: 0,
@@ -128,16 +140,20 @@ const makeStyles = (c: ColorPalette) =>
     name: {
       flex: 1,
       color: c.text,
-      fontSize: 15,
-      fontWeight: "700",
+      fontSize: fontSizes.lg,
+      lineHeight: lineHeights.lg,
+      fontFamily: fontFamilies.semibold,
     },
     subtitle: {
       color: c.textMuted,
-      fontSize: 13,
+      fontSize: fontSizes.sm,
+      lineHeight: lineHeights.sm,
+      fontFamily: fontFamilies.regular,
     },
     footer: {
       color: c.textSubtle,
-      fontSize: 12,
-      lineHeight: 18,
+      fontSize: fontSizes.sm,
+      lineHeight: lineHeights.sm,
+      fontFamily: fontFamilies.regular,
     },
   });

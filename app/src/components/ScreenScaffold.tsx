@@ -3,6 +3,7 @@ import { useMemo, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { type ColorPalette } from "../constants/colors";
+import { fontFamilies, fontSizes, lineHeights } from "../constants/typography";
 import { useI18n } from "../hooks/useI18n";
 import { useThemeColors } from "../hooks/useThemeColors";
 import type { TranslationKey } from "../i18n/he";
@@ -79,13 +80,15 @@ const makeStyles = (c: ColorPalette) =>
     },
     title: {
       color: c.text,
-      fontSize: 24,
-      fontWeight: "700",
+      fontSize: fontSizes.xxl,
+      lineHeight: lineHeights.xxl,
+      fontFamily: fontFamilies.bold,
     },
     description: {
       color: c.textMuted,
-      fontSize: 15,
-      lineHeight: 22,
+      fontSize: fontSizes.sm,
+      lineHeight: lineHeights.sm,
+      fontFamily: fontFamilies.regular,
     },
     primaryButton: {
       minHeight: 48,
@@ -97,7 +100,8 @@ const makeStyles = (c: ColorPalette) =>
     },
     primaryButtonText: {
       color: c.surface,
-      fontSize: 15,
-      fontWeight: "700",
+      fontSize: fontSizes.md,
+      lineHeight: lineHeights.md,
+      fontFamily: fontFamilies.semibold,
     },
   });

@@ -2,6 +2,7 @@ import { useMemo, type ReactNode } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { type ColorPalette } from "../constants/colors";
+import { fontFamilies, fontSizes, lineHeights } from "../constants/typography";
 import { useI18n } from "../hooks/useI18n";
 import { useThemeColors } from "../hooks/useThemeColors";
 
@@ -38,12 +39,14 @@ const makeStyles = (c: ColorPalette) =>
     },
     label: {
       color: c.text,
-      fontSize: 13,
-      fontWeight: "600",
+      fontSize: fontSizes.sm,
+      lineHeight: lineHeights.sm,
+      fontFamily: fontFamilies.semibold,
     },
     required: {
       color: c.danger,
-      fontSize: 13,
-      fontWeight: "700",
+      fontSize: fontSizes.sm,
+      lineHeight: lineHeights.sm,
+      fontFamily: fontFamilies.bold,
     },
   });

@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { getCategoryIcon } from "../constants/categoryIcons";
 import { type ColorPalette } from "../constants/colors";
+import { fontFamilies, fontSizes, lineHeights, radii } from "../constants/typography";
 import { useI18n } from "../hooks/useI18n";
 import { useThemeColors } from "../hooks/useThemeColors";
 import type { Language, Product, WarrantyStatus } from "../types";
@@ -42,25 +43,27 @@ export function DashboardProductCard({ product, onPress, language }: DashboardPr
   const categoryIcon = getCategoryIcon(product.category);
   const stripeColor =
     product.status === "valid" ? colors.accent : product.status === "expiringSoon" ? colors.warning : colors.danger;
-  const iconBg =
-    product.status === "valid"
-      ? colors.accentSoft
-      : product.status === "expiringSoon"
-        ? colors.warningSoft
-        : colors.dangerSoft;
   const iconColor =
     product.status === "valid"
       ? colors.accent
       : product.status === "expiringSoon"
         ? colors.warning
         : colors.danger;
+  const iconBorderColor =
+    product.status === "valid"
+      ? `${colors.accent}26`
+      : product.status === "expiringSoon"
+        ? `${colors.warning}26`
+        : `${colors.danger}26`;
   const isIncomplete =
     !product.receiptImageUrl ||
-    (!product.serial && !product.imei);
+    (!product.serial && !product.imei) ||
+    (product.requiresInstallation && !product.installationDate) ||
+    (product.requiresInstallation && !product.installationImageUrl);
 
   const stripeStyle = isRTL
-    ? { borderRightWidth: 2, borderRightColor: stripeColor }
-    : { borderLeftWidth: 2, borderLeftColor: stripeColor };
+    ? { borderRightWidth: 3, borderRightColor: stripeColor }
+    : { borderLeftWidth: 3, borderLeftColor: stripeColor };
 
   const categoryLabel =
     product.category && product.category in CATEGORY_LABEL_KEYS
@@ -75,7 +78,7 @@ export function DashboardProductCard({ product, onPress, language }: DashboardPr
         <View style={styles.detailsColumn}>
           <View style={styles.detailsTopZone}>
             <View style={[styles.topRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
-              <View style={[styles.iconBlock, { backgroundColor: iconBg }]}>
+              <View style={[styles.iconBlock, { backgroundColor: colors.background, borderColor: iconBorderColor }]}>
                 <Ionicons color={iconColor} name={categoryIcon} size={22} />
               </View>
               <Text numberOfLines={1} style={[styles.name, { textAlign: isRTL ? "right" : "left" }]}>
@@ -166,10 +169,12 @@ const makeStyles = (c: ColorPalette) =>
   StyleSheet.create({
     card: {
       backgroundColor: c.surface,
-      borderRadius: 18,
+      borderRadius: radii.xl,
       borderWidth: 1,
       borderColor: c.border,
-      padding: 16,
+      paddingHorizontal: 16,
+      paddingVertical: 16,
+      overflow: "hidden",
     },
     cardRow: {
       gap: 12,
@@ -181,7 +186,7 @@ const makeStyles = (c: ColorPalette) =>
       gap: 8,
     },
     detailsTopZone: {
-      gap: 10,
+      gap: 8,
     },
     detailsBottomZone: {
       justifyContent: "flex-end",
@@ -195,7 +200,8 @@ const makeStyles = (c: ColorPalette) =>
     iconBlock: {
       width: 44,
       height: 44,
-      borderRadius: 14,
+      borderRadius: radii.lg,
+      borderWidth: 1,
       alignItems: "center",
       justifyContent: "center",
       flexShrink: 0,
@@ -210,13 +216,16 @@ const makeStyles = (c: ColorPalette) =>
     },
     name: {
       flex: 1,
-      fontSize: 15,
-      fontWeight: "700",
+      fontSize: fontSizes.lg,
+      lineHeight: lineHeights.lg,
+      fontFamily: fontFamilies.semibold,
       color: c.text,
     },
     middleText: {
       color: c.textMuted,
-      fontSize: 13,
+      fontSize: fontSizes.sm,
+      lineHeight: lineHeights.sm,
+      fontFamily: fontFamilies.regular,
     },
     timeline: {
       gap: 8,
@@ -224,13 +233,12 @@ const makeStyles = (c: ColorPalette) =>
     },
     timelineIcons: {
       alignItems: "center",
-      gap: 3,
-      paddingTop: 1,
+      gap: 4,
     },
     timelineConnector: {
       width: 1,
       flex: 1,
-      minHeight: 6,
+      minHeight: 8,
       backgroundColor: c.border,
     },
     timelineTexts: {
@@ -238,9 +246,10 @@ const makeStyles = (c: ColorPalette) =>
       gap: 4,
     },
     timelineText: {
-      fontSize: 12,
+      fontSize: fontSizes.sm,
+      lineHeight: lineHeights.sm,
+      fontFamily: fontFamilies.regular,
       color: c.textSubtle,
-      lineHeight: 16,
     },
     bottomRow: {
       width: "100%",
@@ -249,15 +258,20 @@ const makeStyles = (c: ColorPalette) =>
     },
     chip: {
       backgroundColor: c.background,
-      borderRadius: 999,
+      minHeight: 32,
+      borderRadius: radii.md,
       borderWidth: 1,
       borderColor: c.border,
-      paddingHorizontal: 10,
-      paddingVertical: 5,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      alignItems: "center",
+      justifyContent: "center",
     },
     chipText: {
-      fontSize: 12,
-      fontWeight: "600",
+      maxWidth: "100%",
+      fontSize: fontSizes.sm,
+      lineHeight: lineHeights.sm,
+      fontFamily: fontFamilies.medium,
       color: c.textMuted,
     },
   });

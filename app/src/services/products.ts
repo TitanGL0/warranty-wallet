@@ -13,8 +13,17 @@ import {
 import type { Unsubscribe } from "firebase/firestore";
 
 import { db } from "./firebase";
-import { copyReceiptToDocuments, deleteLocalReceipt } from "./receiptStorage";
-import { computeWarrantyEnd, computeWarrantyStatus } from "../utils/warranty";
+import {
+  copyInstallationToDocuments,
+  copyReceiptToDocuments,
+  deleteLocalInstallation,
+  deleteLocalReceipt,
+} from "./receiptStorage";
+import {
+  computeWarrantyEnd,
+  computeWarrantyStartDate,
+  computeWarrantyStatus,
+} from "../utils/warranty";
 import type { Product, ProductInput } from "../types";
 
 type RawFirestoreProduct = {
@@ -33,6 +42,11 @@ type RawFirestoreProduct = {
   notes?: string;
   price?: number | null;
   currency?: string;
+  requiresInstallation?: boolean;
+  installationDate?: string | null;
+  installerName?: string | null;
+  installationNotes?: string | null;
+  installationImageUrl?: string | null;
   receiptImageUrl?: string | null;
   warrantyImageUrl?: string | null;
   createdAt?: Timestamp;
@@ -51,9 +65,11 @@ export async function addProduct(
   uid: string,
   input: Omit<ProductInput, "receiptImageUrl">,
   receiptLocalUri?: string | null,
+  installLocalUri?: string | null,
 ): Promise<string> {
   const productDocRef = doc(collection(db, "users", uid, "products"));
   let receiptImageUrl: string | null = null;
+  let installationImageUrl: string | null = null;
 
   if (receiptLocalUri) {
     try {
@@ -63,9 +79,18 @@ export async function addProduct(
     }
   }
 
+  if (installLocalUri) {
+    try {
+      installationImageUrl = await copyInstallationToDocuments(installLocalUri, productDocRef.id);
+    } catch {
+      installationImageUrl = null;
+    }
+  }
+
   await setDoc(productDocRef, {
     ...input,
     receiptImageUrl,
+    installationImageUrl,
     id: productDocRef.id,
     userId: uid,
     createdAt: serverTimestamp(),
@@ -75,9 +100,15 @@ export async function addProduct(
   return productDocRef.id;
 }
 
-export async function deleteProduct(uid: string, productId: string, receiptUrl?: string | null): Promise<void> {
+export async function deleteProduct(
+  uid: string,
+  productId: string,
+  receiptUrl?: string | null,
+  installUrl?: string | null,
+): Promise<void> {
   await deleteDoc(doc(db, "users", uid, "products", productId));
   await deleteLocalReceipt(receiptUrl);
+  await deleteLocalInstallation(installUrl);
 }
 
 export async function updateProduct(
@@ -87,8 +118,12 @@ export async function updateProduct(
   receiptLocalUri?: string | null,
   existingReceiptUrl?: string | null,
   originalReceiptUrl?: string | null,
+  installLocalUri?: string | null,
+  existingInstallUrl?: string | null,
+  originalInstallUrl?: string | null,
 ): Promise<void> {
   let receiptImageUrl = existingReceiptUrl ?? null;
+  let installationImageUrl = existingInstallUrl ?? null;
 
   if (receiptLocalUri) {
     try {
@@ -102,9 +137,22 @@ export async function updateProduct(
     receiptImageUrl = null;
   }
 
+  if (installLocalUri) {
+    try {
+      await deleteLocalInstallation(originalInstallUrl);
+      installationImageUrl = await copyInstallationToDocuments(installLocalUri, productId);
+    } catch {
+      installationImageUrl = null;
+    }
+  } else if (existingInstallUrl === null && originalInstallUrl) {
+    await deleteLocalInstallation(originalInstallUrl);
+    installationImageUrl = null;
+  }
+
   await updateDoc(doc(db, "users", uid, "products", productId), {
     ...input,
     receiptImageUrl,
+    installationImageUrl,
     updatedAt: serverTimestamp(),
   });
 }
@@ -122,7 +170,14 @@ export function subscribeToProducts(
       const products = snapshot.docs.map((snapshotDoc) => {
         const data = snapshotDoc.data() as RawFirestoreProduct;
         const warrantyMonths = data.warrantyMonths ?? ((data.warrantyYears ?? 1) * 12);
-        const warrantyEnd = computeWarrantyEnd(data.purchaseDate, warrantyMonths);
+        const requiresInstallation = data.requiresInstallation ?? false;
+        const installationDate = data.installationDate ?? null;
+        const warrantyStartDate = computeWarrantyStartDate(
+          data.purchaseDate,
+          requiresInstallation,
+          installationDate,
+        );
+        const warrantyEnd = computeWarrantyEnd(warrantyStartDate, warrantyMonths);
 
         return {
           id: snapshotDoc.id,
@@ -133,6 +188,12 @@ export function subscribeToProducts(
           serial: data.serial ?? "",
           imei: data.imei ?? "",
           purchaseDate: data.purchaseDate,
+          requiresInstallation,
+          installationDate,
+          installerName: data.installerName ?? "",
+          installationNotes: data.installationNotes ?? "",
+          installationImageUrl: data.installationImageUrl ?? null,
+          warrantyStartDate,
           warrantyYears: data.warrantyYears,
           warrantyMonths,
           importer: data.importer ?? "",

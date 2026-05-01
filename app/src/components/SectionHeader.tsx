@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { type ColorPalette } from "../constants/colors";
+import { fontFamilies, fontSizes, lineHeights } from "../constants/typography";
 import { useThemeColors } from "../hooks/useThemeColors";
 
 type SectionHeaderProps = {
@@ -37,12 +38,14 @@ const makeStyles = (c: ColorPalette) =>
     title: {
       flex: 1,
       color: c.text,
-      fontSize: 18,
-      fontWeight: "700",
+      fontSize: fontSizes.lg,
+      lineHeight: lineHeights.lg,
+      fontFamily: fontFamilies.semibold,
     },
     action: {
       color: c.primary,
-      fontSize: 13,
-      fontWeight: "700",
+      fontSize: fontSizes.sm,
+      lineHeight: lineHeights.sm,
+      fontFamily: fontFamilies.semibold,
     },
   });

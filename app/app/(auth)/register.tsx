@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 
 
 import { AuthShell } from "../../src/components/AuthShell";
 import { type ColorPalette } from "../../src/constants/colors";
+import { fontFamilies, fontSizes, lineHeights } from "../../src/constants/typography";
 import { useI18n } from "../../src/hooks/useI18n";
 import { useThemeColors } from "../../src/hooks/useThemeColors";
 import type { TranslationKey } from "../../src/i18n/he";
@@ -135,16 +136,18 @@ const makeStyles = (c: ColorPalette) =>
     },
     cardTitle: {
       color: c.text,
-      fontSize: 20,
-      fontWeight: "700",
+      fontSize: fontSizes.xl,
+      lineHeight: lineHeights.xl,
+      fontFamily: fontFamilies.bold,
     },
     fieldGroup: {
       gap: 6,
     },
     label: {
       color: c.textMuted,
-      fontSize: 12,
-      fontWeight: "600",
+      fontSize: fontSizes.xs,
+      lineHeight: lineHeights.xs,
+      fontFamily: fontFamilies.semibold,
       letterSpacing: 0.3,
     },
     input: {
@@ -155,7 +158,9 @@ const makeStyles = (c: ColorPalette) =>
       backgroundColor: c.background,
       paddingHorizontal: 14,
       color: c.text,
-      fontSize: 15,
+      fontSize: fontSizes.md,
+      lineHeight: lineHeights.md,
+      fontFamily: fontFamilies.regular,
     },
     inputDisabled: {
       opacity: 0.6,
@@ -170,18 +175,21 @@ const makeStyles = (c: ColorPalette) =>
     },
     primaryButtonText: {
       color: c.surface,
-      fontSize: 16,
-      fontWeight: "700",
+      fontSize: fontSizes.md,
+      lineHeight: lineHeights.md,
+      fontFamily: fontFamilies.semibold,
     },
     errorText: {
       color: c.danger,
-      fontSize: 13,
-      lineHeight: 20,
+      fontSize: fontSizes.sm,
+      lineHeight: lineHeights.sm,
+      fontFamily: fontFamilies.regular,
     },
     switchLink: {
       color: c.primary,
-      fontSize: 14,
-      fontWeight: "700",
+      fontSize: fontSizes.sm,
+      lineHeight: lineHeights.sm,
+      fontFamily: fontFamilies.semibold,
       textAlign: "center",
     },
   });
